@@ -35,6 +35,9 @@ public class RequestIdFilter extends OncePerRequestFilter {
         response.setHeader(HEADER_NAME, requestId);
         try {
             filterChain.doFilter(request, response);
+        } catch (IOException | ServletException | RuntimeException exception) {
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            throw exception;
         } finally {
             try {
                 int statusCode = response.getStatus();
