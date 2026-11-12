@@ -40,4 +40,18 @@ class RequestIdFilterTest {
         verify(operationLogger).log(
                 Level.ERROR, "api", "health", "error", "Web operation completed");
     }
+
+    @Test
+    void logsUnmappedPathsWithGeneratedRequestIds() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setMethod("GET");
+        request.setRequestURI("/api/web/private");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilterInternal(request, response, (servletRequest, servletResponse) -> { });
+
+        assertThat(response.getHeader(RequestIdFilter.HEADER_NAME)).isNotBlank();
+        verify(operationLogger).log(
+                Level.INFO, "api", "get_/api/web/private", "success", "Web operation completed");
+    }
 }
