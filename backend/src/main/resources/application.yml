@@ -21,10 +21,11 @@ server:
         secure: ${SESSION_COOKIE_SECURE:false}
 logging:
   pattern:
-    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} [%thread] %-5level %logger{36} [request_id=%X{request_id:-none}] - %msg%n"
-  level:
-    org.hibernate.SQL: DEBUG
+    console: "%msg%n"
 app:
   admin:
     username: ${APP_ADMIN_USERNAME:findmypacksadmin}
     password: ${APP_ADMIN_PASSWORD:findmypacksadmin}
+  cli:
+    enabled: false
+    operation: admin-status
