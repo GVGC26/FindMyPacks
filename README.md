@@ -93,7 +93,7 @@ git fetch origin
 git worktree add ../FindMyPacks-backend -b feat/backend origin/main
 ```
 
-Use corresponding distinct directory and branch names for the other contributors. Integrate changes through pull requests; never commit directly to `main`. The `main` branch is protected to require PRs and the `compose-tests` status check. The repository's pull request template is in `.github/PULL_REQUEST_TEMPLATE.md`.
+Use corresponding distinct directory and branch names for the other contributors. Integrate changes through pull requests; never commit directly to `main`. Sign every commit in the PR with an SSH key registered on GitHub; the required `ssh-signatures` check verifies each commit before merge. GitHub rebase-and-merge rewrites commits and does not sign the resulting commits, so signature validation is enforced on PR commits rather than on `main`. The repository allows only Rebase and merge and requires a linear history, the `compose-tests` and `ssh-signatures` checks, and two approvals. The repository's pull request template is in `.github/PULL_REQUEST_TEMPLATE.md`.
 
 ## Deployment
 
