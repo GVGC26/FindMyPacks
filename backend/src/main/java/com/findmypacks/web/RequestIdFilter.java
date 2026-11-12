@@ -55,6 +55,15 @@ public class RequestIdFilter extends OncePerRequestFilter {
     }
 
     private String operationFor(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        String method = request.getMethod();
+        if ("/api/web/records".equals(uri) && "POST".equals(method)) {
+            return "create";
+        }
+        if (uri.startsWith("/api/web/records/") && "PUT".equals(method)) {
+            return "update";
+        }
+
         return switch (request.getRequestURI()) {
             case "/api/web/health" -> "health";
             case "/api/web/csrf" -> "csrf";

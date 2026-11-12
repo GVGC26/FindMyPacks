@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
+import PackageForm from "./PackageForm";
 
 type LoginResult = {
   username: string;
@@ -64,72 +65,99 @@ export default function App() {
     <div className="page-shell">
       <header className="topbar">
         <a className="brand" href="/" aria-label="FindMyPacks - página inicial">
-          <span className="brand-mark" aria-hidden="true">F</span>
+          <span className="brand-mark" aria-hidden="true">
+            F
+          </span>
           <span>FindMyPacks</span>
         </a>
         <span className="topbar-note">Sua coleção, em um só lugar</span>
       </header>
 
-      <main className="hero">
-        <section className="intro" aria-labelledby="welcome-title">
-          <span className="eyebrow">BEM-VINDO AO FINDMYPACKS</span>
-          <h1 id="welcome-title">Encontre espaço para o que você coleciona.</h1>
-          <p>
-            Organize seus pacotes e acompanhe sua coleção com uma experiência
-            simples, feita para você.
+      {signedInAs ? (
+        <main className="workspace">
+          <p className="welcome-note" role="status">
+            Bem-vindo, {signedInAs}.
           </p>
-          <div className="feature-list" aria-label="Recursos">
-            <div><span aria-hidden="true">01</span> Tudo organizado em um só lugar</div>
-            <div><span aria-hidden="true">02</span> Acesso seguro à sua conta</div>
-          </div>
-        </section>
-
-        <section className="login-card" aria-labelledby="login-title">
-          <div className="card-icon" aria-hidden="true">↗</div>
-          {signedInAs ? (
-            <div role="status">
-              <h2 id="login-title">Você entrou</h2>
-              <p className="form-description">Bem-vindo, {signedInAs}.</p>
+          <PackageForm />
+        </main>
+      ) : (
+        <main className="hero">
+          <section className="intro" aria-labelledby="welcome-title">
+            <span className="eyebrow">BEM-VINDO AO FINDMYPACKS</span>
+            <h1 id="welcome-title">
+              Encontre espaço para o que você coleciona.
+            </h1>
+            <p>
+              Organize seus pacotes e acompanhe sua coleção com uma experiência
+              simples, feita para você.
+            </p>
+            <div className="feature-list" aria-label="Recursos">
+              <div>
+                <span aria-hidden="true">01</span> Tudo organizado em um só
+                lugar
+              </div>
+              <div>
+                <span aria-hidden="true">02</span> Acesso seguro à sua conta
+              </div>
             </div>
-          ) : (
-            <>
-              <h2 id="login-title">Acesse sua conta</h2>
-              <p className="form-description">Entre para continuar sua jornada.</p>
-              <form onSubmit={handleSubmit}>
-                <label htmlFor="username">Usuário</label>
-                <input
-                  autoComplete="username"
-                  id="username"
-                  name="username"
-                  onChange={(event) => setUsername(event.target.value)}
-                  placeholder="Seu usuário"
-                  required
-                  value={username}
-                />
-                <label htmlFor="password">Senha</label>
-                <input
-                  autoComplete="current-password"
-                  id="password"
-                  name="password"
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Sua senha"
-                  required
-                  type="password"
-                  value={password}
-                />
-                {error && <p className="error-message" role="alert">{error}</p>}
-                <button disabled={isSubmitting} type="submit">
-                  {isSubmitting ? "Entrando..." : "Entrar"}
-                  <span aria-hidden="true">→</span>
-                </button>
-              </form>
-              <p className="security-note">
-                <span aria-hidden="true">●</span> Seus dados são protegidos por uma conexão segura.
-              </p>
-            </>
-          )}
-        </section>
-      </main>
+          </section>
+
+          <section className="login-card" aria-labelledby="login-title">
+            <div className="card-icon" aria-hidden="true">
+              ↗
+            </div>
+            {signedInAs ? (
+              <div role="status">
+                <h2 id="login-title">Você entrou</h2>
+                <p className="form-description">Bem-vindo, {signedInAs}.</p>
+              </div>
+            ) : (
+              <>
+                <h2 id="login-title">Acesse sua conta</h2>
+                <p className="form-description">
+                  Entre para continuar sua jornada.
+                </p>
+                <form onSubmit={handleSubmit}>
+                  <label htmlFor="username">Usuário</label>
+                  <input
+                    autoComplete="username"
+                    id="username"
+                    name="username"
+                    onChange={(event) => setUsername(event.target.value)}
+                    placeholder="Seu usuário"
+                    required
+                    value={username}
+                  />
+                  <label htmlFor="password">Senha</label>
+                  <input
+                    autoComplete="current-password"
+                    id="password"
+                    name="password"
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Sua senha"
+                    required
+                    type="password"
+                    value={password}
+                  />
+                  {error && (
+                    <p className="error-message" role="alert">
+                      {error}
+                    </p>
+                  )}
+                  <button disabled={isSubmitting} type="submit">
+                    {isSubmitting ? "Entrando..." : "Entrar"}
+                    <span aria-hidden="true">→</span>
+                  </button>
+                </form>
+                <p className="security-note">
+                  <span aria-hidden="true">●</span> Seus dados são protegidos
+                  por uma conexão segura.
+                </p>
+              </>
+            )}
+          </section>
+        </main>
+      )}
 
       <footer className="footer">
         <span>© {new Date().getFullYear()} FindMyPacks</span>

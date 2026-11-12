@@ -277,3 +277,89 @@ button:disabled {
     gap: 8px;
   }
 }
+
+/* Acrescentar ao final de frontend/src/styles.css */
+
+select {
+  background: #fbfbfd;
+  border: 1px solid #e4e6ed;
+  border-radius: 9px;
+  color: #172033;
+  font: inherit;
+  margin-bottom: 18px;
+  outline: none;
+  padding: 13px 14px;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+select:focus {
+  border-color: #8178ef;
+  box-shadow: 0 0 0 3px rgba(100, 89, 232, 0.12);
+}
+
+input[aria-invalid="true"],
+select[aria-invalid="true"] {
+  border-color: #bd3344;
+}
+
+.package-card {
+  background: white;
+  border: 1px solid #e8eaf1;
+  border-radius: 20px;
+  box-shadow: 0 22px 70px rgba(37, 43, 69, 0.08);
+  margin: 0 0 48px;
+  padding: 36px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 0 24px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.secondary-button {
+  background: #f0efff;
+  color: #6459e8;
+}
+
+.secondary-button:hover {
+  background: #e4e1ff;
+}
+
+.success-message {
+  color: #1f8a65;
+  font-size: 12px;
+  margin: -4px 0 14px;
+}
+
+@media (max-width: 760px) {
+  .package-card {
+    padding: 28px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.workspace {
+  flex: 1;
+  padding: 8px 0 24px;
+}
+
+.welcome-note {
+  color: #687186;
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+
