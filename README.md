@@ -84,6 +84,111 @@ docker compose logs -f app
 
 The protected `status` command produces one `api` event and one `db` event with `client` set to `cli` and the same `request_id`. Credentials and tokens are never included in these logs.
 
+## Package registration and editing (issue #2)
+
+After signing in, the home page shows a form to register and edit packages. Every field is required.
+
+| Field | Form label | Rule |
+|---|---|---|
+| `trackingCode` | Código de rastreio | 8 to 20 letters or digits; must be unique |
+| `customer` | Cliente | 2 to 100 characters |
+| `destination` | Destino | 2 to 100 characters |
+| `carrier` | Transportadora | One of `CORREIOS`, `JADLOG`, `LOGGI`, `OTHER` |
+| `status` | Status | One of `POSTED`, `IN_TRANSIT`, `OUT_FOR_DELIVERY`, `DELIVERED` |
+| `postedAt` | Data de postagem | ISO date (`yyyy-MM-dd`); cannot be in the future |
+
+The form shows the Portuguese labels (for example "Em trânsito"), but sends the codes above to the API. Text fields are trimmed before validation. The same rules are enforced in the form, in the API (Bean Validation), and by constraints in the database.
+
+**How to use it:**
+
+1. Sign in and fill in the form.
+2. Click **Cadastrar pacote**. On success the page shows "Pacote cadastrado." and the form switches to editing the saved record ("Editar pacote #N").
+3. Change any field and click **Salvar alterações** to update it ("Pacote atualizado.").
+4. Click **Novo cadastro** to clear the form and register another package.
+
+Validation errors appear under each field. A tracking code that is already registered is rejected with a message on that field.
+
+### Data model
+
+The migration `backend/src/main/resources/db/migration/V2__create_packages.sql` creates the `packages` table:
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `BIGSERIAL` | Primary key |
+| `tracking_code` | `VARCHAR(20)` | Not null, unique |
+| `customer` | `VARCHAR(100)` | Not null |
+| `destination` | `VARCHAR(100)` | Not null |
+| `carrier` | `VARCHAR(20)` | Not null; check constraint on the allowed values |
+| `status` | `VARCHAR(20)` | Not null; check constraint on the allowed values |
+| `posted_at` | `DATE` | Not null |
+
+To inspect the stored data:
+
+```sh
+docker compose exec db psql -U findmypacks -d findmypacks -c "SELECT * FROM packages;"
+```
+
+### Endpoints
+
+Both endpoints require an authenticated session and a CSRF token (`GET /api/web/csrf`, sent in the `X-XSRF-TOKEN` header). Requests without a valid session receive HTTP 401. The JSON body uses the camelCase field names from the table above.
+
+| Operation | Method and path | Success |
+|---|---|---|
+| Register a package | `POST /api/web/records` | `201` with the saved record |
+| Edit a package | `PUT /api/web/records/{id}` | `200` with the updated record |
+
+Error responses use the body `{"message": "...", "fieldErrors": {"field": "message"}}`:
+
+| Status | When |
+|---|---|
+| `400` | A field is invalid (`fieldErrors` lists each one) or the body is malformed |
+| `401` | No valid session |
+| `404` | `PUT` with an `id` that does not exist |
+| `409` | The tracking code is already registered by another package |
+
+Example with PowerShell, reusing the `$session` from the login example above:
+
+```powershell
+$csrf = Invoke-RestMethod -Uri http://localhost:8080/api/web/csrf -WebSession $session
+$body = @{
+  trackingCode = "BR12345678"; customer = "Maria Silva"; destination = "Fortaleza"
+  carrier = "CORREIOS"; status = "POSTED"; postedAt = "2026-11-10"
+} | ConvertTo-Json
+Invoke-RestMethod -Uri http://localhost:8080/api/web/records -Method Post -WebSession $session `
+  -Headers @{ "X-XSRF-TOKEN" = $csrf.token; "X-Request-Id" = "manual-test-1" } `
+  -ContentType "application/json" -Body $body
+```
+
+A successful response looks like this:
+
+```json
+{
+  "id": 1,
+  "trackingCode": "BR12345678",
+  "customer": "Maria Silva",
+  "destination": "Fortaleza",
+  "carrier": "CORREIOS",
+  "status": "POSTED",
+  "postedAt": "2026-11-10"
+}
+```
+
+To edit, send the same body with `-Method Put` to `http://localhost:8080/api/web/records/1`.
+
+### Logs for these operations
+
+Registering a package logs an `api` event with the operation `create`, and editing logs `update`. The same request also produces `db` events with the same `request_id`: `check_tracking_code`, `find_package_by_id` (edit only), and `insert` or `update`. To follow one request, reuse the `X-Request-Id` header and filter the logs:
+
+```sh
+docker compose logs app | grep manual-test-1
+```
+
+On PowerShell, use `docker compose logs app | Select-String manual-test-1`. Passwords, tokens, and request payloads are not logged.
+
+### Tests
+
+The backend tests for this feature are `PackageDataAccessTest` (data access and `db` logs), `PackageApiIntegrationTest` (endpoints, validation, authentication, and correlated logs), and `AdminUserSeederTest` (keeps the 100% coverage independent of the database state). The form is covered by `PackageForm.test.tsx`. Run them with the command in the next section.
+
 ## Run tests
 
 The test service runs frontend and backend tests in containers and uses the Compose PostgreSQL service:
