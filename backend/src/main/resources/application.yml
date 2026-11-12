@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: findmypacks
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/findmypacks}
+    username: ${SPRING_DATASOURCE_USERNAME:findmypacks}
+    password: ${SPRING_DATASOURCE_PASSWORD:findmypacks-dev}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+server:
+  port: 8080
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:false}
+app:
+  admin:
+    username: ${APP_ADMIN_USERNAME:findmypacksadmin}
+    password: ${APP_ADMIN_PASSWORD:findmypacksadmin}

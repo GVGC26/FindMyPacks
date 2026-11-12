@@ -1,0 +1,43 @@
+name: Compose CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  compose-tests:
+    name: compose-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Start PostgreSQL
+        run: docker compose up -d db
+
+      - name: Run frontend and backend tests
+        run: docker compose --profile test run --build --rm tests
+
+      - name: Build the monolithic application image
+        run: docker compose build app
+
+      - name: Verify the complete stack
+        run: |
+          docker compose up -d app
+          for attempt in {1..30}; do
+            if curl --fail --silent http://localhost:8080/api/web/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs app
+          exit 1
+
+      - name: Stop Compose services
+        if: always()
+        run: docker compose down -v
