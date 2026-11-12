@@ -43,11 +43,20 @@ Invoke-RestMethod -Uri http://localhost:8080/api/web/login -Method Post -WebSess
 
 ## Logs and request correlation
 
-API responses include an `X-Request-Id` header. Valid IDs supplied by callers are reused; invalid or missing IDs are replaced with a generated ID. The application request log and Hibernate SQL logs include the same `request_id`; SQL bind values are not logged.
+Each Web and CLI operation writes a single-line JSON event to stdout with an ISO 8601 UTC timestamp, level, layer, client, operation, status, request ID, and a short message. Database reads made by an operation produce a separate `db` event with the same request ID and client. Successful and failed login attempts are logged without passwords or request payloads. SQL statements and bind values are not logged.
 
 ```sh
-docker compose logs -f app db
+docker compose logs -f app
 ```
+
+API responses include an `X-Request-Id` header. Valid IDs supplied by callers are reused; invalid or missing IDs are replaced with a generated ID. To exercise a CLI read against the database, run:
+
+```sh
+docker compose --profile cli up --build cli
+docker compose --profile cli logs cli
+```
+
+The CLI reports whether the configured administrator exists. Its `api` and `db` events share a request ID and are retained in the Compose service logs.
 
 ## Run tests
 
@@ -73,7 +82,7 @@ docker compose down -v
 
 Three contributors can work asynchronously in separate worktrees and topic branches:
 
-1. **Backend and database:** `backend/` (Spring Boot API, migrations, and API tests).
+1. **Backend and database:** `backend/` (Spring Boot API, migrations, CLI, and API tests).
 2. **Web interface:** `frontend/` (React/Vite page, login flow, and UI tests).
 3. **Integration and delivery:** `compose.yaml`, `Dockerfile`, `.github/`, and documentation.
 

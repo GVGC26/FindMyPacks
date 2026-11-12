@@ -36,6 +36,27 @@ services:
       retries: 12
       start_period: 30s
 
+  cli:
+    build:
+      context: .
+      target: app
+    profiles: ["cli"]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/findmypacks
+      SPRING_DATASOURCE_USERNAME: findmypacks
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-findmypacks-dev}
+      APP_ADMIN_USERNAME: ${APP_ADMIN_USERNAME:-findmypacksadmin}
+      APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-findmypacksadmin}
+    command:
+      - --spring.main.web-application-type=none
+      - --app.cli.enabled=true
+      - --app.cli.operation=admin-status
+    healthcheck:
+      disable: true
+    depends_on:
+      db:
+        condition: service_healthy
+
   tests:
     build:
       context: .

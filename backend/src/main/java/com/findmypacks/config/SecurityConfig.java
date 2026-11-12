@@ -1,6 +1,6 @@
 package com.findmypacks.config;
 
-import com.findmypacks.user.AppUserRepository;
+import com.findmypacks.user.AppUserDataAccess;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -52,7 +52,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    UserDetailsService userDetailsService(AppUserRepository users) {
+    UserDetailsService userDetailsService(AppUserDataAccess users) {
         return username -> users.findByUsername(username)
                 .map(user -> User.withUsername(user.getUsername())
                         .password(user.getPasswordHash())
