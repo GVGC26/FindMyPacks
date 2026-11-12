@@ -41,6 +41,14 @@ Invoke-RestMethod -Uri http://localhost:8080/api/web/login -Method Post -WebSess
   -Body (@{ username = "findmypacksadmin"; password = "findmypacksadmin" } | ConvertTo-Json)
 ```
 
+## Logs and request correlation
+
+API responses include an `X-Request-Id` header. Valid IDs supplied by callers are reused; invalid or missing IDs are replaced with a generated ID. The application request log and Hibernate SQL logs include the same `request_id`; SQL bind values are not logged.
+
+```sh
+docker compose logs -f app db
+```
+
 ## Run tests
 
 The test service runs frontend and backend tests in containers and uses the Compose PostgreSQL service:

@@ -7,6 +7,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
 import com.findmypacks.user.AdminUserSeeder;
 import com.findmypacks.user.AppUser;
@@ -42,6 +43,21 @@ class WebApiIntegrationTest {
         mockMvc.perform(get("/api/web/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
+    void validRequestIdIsReturnedForCorrelation() throws Exception {
+        mockMvc.perform(get("/api/web/health").header("X-Request-Id", "test-request-123"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Request-Id", "test-request-123"));
+    }
+
+    @Test
+    void invalidRequestIdIsReplaced() throws Exception {
+        mockMvc.perform(get("/api/web/health").header("X-Request-Id", "invalid request id"))
+                .andExpect(status().isOk())
+                .andExpect(header().exists("X-Request-Id"))
+                .andExpect(header().string("X-Request-Id", org.hamcrest.Matchers.not("invalid request id")));
     }
 
     @Test
