@@ -19,6 +19,11 @@ server:
         http-only: true
         same-site: lax
         secure: ${SESSION_COOKIE_SECURE:false}
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} [%thread] %-5level %logger{36} [request_id=%X{request_id:-none}] - %msg%n"
+  level:
+    org.hibernate.SQL: DEBUG
 app:
   admin:
     username: ${APP_ADMIN_USERNAME:findmypacksadmin}
