@@ -22,6 +22,9 @@ public class CliApplication {
                                            Register a package
               update <id> <trackingCode> <customer> <destination> <carrier> <status> <postedAt>
                                            Edit a package
+              list [page] [sortField] [direction]
+                                           List five packages per page
+              delete <id>                  Delete a package
 
             Environment:
               FINDMYPACKS_API_URL  API URL (default: http://app:8080)
@@ -45,6 +48,8 @@ public class CliApplication {
                         baseUrl, client, out, err);
                 case "update" -> writeRecord(args, 8, "PUT", "/api/cli/records/" + argument(args, 1), environment,
                         baseUrl, client, out, err);
+                case "list" -> listRecords(args, environment, baseUrl, client, out, err);
+                case "delete" -> deleteRecord(args, environment, baseUrl, client, out, err);
                 default -> unknown(command, err);
             };
         } catch (IOException exception) {
@@ -119,6 +124,54 @@ public class CliApplication {
 
     private String argument(String[] args, int index) {
         return args.length > index ? args[index] : "";
+    }
+
+    private int listRecords(
+            String[] args,
+            Map<String, String> environment,
+            String baseUrl,
+            HttpClient client,
+            PrintStream out,
+            PrintStream err) throws IOException, InterruptedException {
+        if (args.length > 4) {
+            err.println("Usage: list [page] [sortField] [direction]");
+            return 2;
+        }
+        String page = args.length > 1 ? args[1] : "0";
+        String sortField = args.length > 2 ? args[2] : "postedAt";
+        String direction = args.length > 3 ? args[3] : "desc";
+        return protectedRequest(environment, baseUrl + "/api/cli/records?page=" + page
+                + "&size=5&sort=" + sortField + "," + direction, "GET", client, out, err);
+    }
+
+    private int deleteRecord(
+            String[] args,
+            Map<String, String> environment,
+            String baseUrl,
+            HttpClient client,
+            PrintStream out,
+            PrintStream err) throws IOException, InterruptedException {
+        if (args.length != 2) {
+            err.println("Usage: delete <id>");
+            return 2;
+        }
+        return protectedRequest(environment, baseUrl + "/api/cli/records/" + args[1],
+                "DELETE", client, out, err);
+    }
+
+    private int protectedRequest(
+            Map<String, String> environment,
+            String url,
+            String method,
+            HttpClient client,
+            PrintStream out,
+            PrintStream err) throws IOException, InterruptedException {
+        String token = environment.get("FINDMYPACKS_TOKEN");
+        if (token == null || token.isBlank()) {
+            err.println("Set FINDMYPACKS_TOKEN before using protected commands");
+            return 2;
+        }
+        return request(client, request(url, method, null, token), out, err);
     }
 
     private HttpRequest request(String url, String method, String body, String token) {
