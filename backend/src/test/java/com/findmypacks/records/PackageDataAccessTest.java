@@ -15,6 +15,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 class PackageDataAccessTest {
     private final PackageRecordRepository repository = mock(PackageRecordRepository.class);
@@ -73,6 +75,21 @@ class PackageDataAccessTest {
         assertThat(dataAccess.findByIdForCli(1L)).contains(record);
         assertThat(dataAccess.existsByTrackingCodeForCli("CLI12345")).isFalse();
         assertThat(dataAccess.existsByTrackingCodeAndIdNotForCli("CLI12345", 1L)).isFalse();
+    }
+
+    @Test
+    void supportsCliListingAndDeletion() {
+        Pageable pageable = mock(Pageable.class);
+        @SuppressWarnings("unchecked")
+        Page<PackageRecord> page = mock(Page.class);
+        when(repository.findAll(pageable)).thenReturn(page);
+
+        assertThat(dataAccess.findAllForCli(pageable)).isSameAs(page);
+        dataAccess.deleteByIdForCli(1L);
+
+        verify(repository).deleteById(1L);
+        verify(operationLogger).log(Level.INFO, "db", "list", "success", "Package records listed");
+        verify(operationLogger).log(Level.INFO, "db", "delete", "success", "Package record deleted");
     }
 
     @Test
