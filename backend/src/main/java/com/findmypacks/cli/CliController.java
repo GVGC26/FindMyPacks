@@ -18,6 +18,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -25,6 +27,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -94,6 +97,21 @@ public class CliController {
         record.update(request.trackingCode(), request.customer(), request.destination(),
                 request.carrier(), request.status(), request.postedAt());
         return PackageResponse.from(packages.updateForCli(record));
+    }
+
+    @GetMapping("/records")
+    public Page<PackageResponse> list(Pageable pageable) {
+        return packages.findAllForCli(pageable).map(PackageResponse::from);
+    }
+
+    @DeleteMapping("/records/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        if (packages.findByIdForCli(id).isEmpty()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.NOT_FOUND, "Package not found");
+        }
+        packages.deleteByIdForCli(id);
+        return ResponseEntity.noContent().build();
     }
 
     private PackageRecord record(PackageRequest request) {

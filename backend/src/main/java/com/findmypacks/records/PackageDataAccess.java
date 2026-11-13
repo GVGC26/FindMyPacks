@@ -57,6 +57,18 @@ public class PackageDataAccess {
                 () -> packages.existsByTrackingCodeAndIdNot(trackingCode, id));
     }
 
+    public Page<PackageRecord> findAllForCli(Pageable pageable) {
+        return run("list", "Package records listed", "Package records list failed",
+                () -> packages.findAll(pageable));
+    }
+
+    public void deleteByIdForCli(Long id) {
+        run("delete", "Package record deleted", "Package record delete failed", () -> {
+            packages.deleteById(id);
+            return null;
+        });
+    }
+
     public Optional<PackageRecord> findById(Long id) {
         return run("find_package_by_id", "Package record read", "Package record read failed",
                 () -> packages.findById(id));
