@@ -43,7 +43,10 @@ public class RequestIdFilter extends OncePerRequestFilter {
                 int statusCode = response.getStatus();
                 String status = statusCode >= 400 ? "error" : "success";
                 Level level = statusCode >= 500 ? Level.ERROR : statusCode >= 400 ? Level.WARN : Level.INFO;
-                operationLogger.log(level, "api", operationFor(request), status, "API operation completed");
+                String message = "cli".equals(clientFor(request))
+                        ? "API operation completed"
+                        : "Web operation completed";
+                operationLogger.log(level, "api", operationFor(request), status, message);
             } finally {
                 MDC.remove("request_id");
                 MDC.remove("client");
