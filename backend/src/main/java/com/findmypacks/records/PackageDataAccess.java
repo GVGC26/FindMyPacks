@@ -32,6 +32,31 @@ public class PackageDataAccess {
                 () -> packages.save(record));
     }
 
+    public PackageRecord insertForCli(PackageRecord record) {
+        return run("insert", "Package record persisted", "Package record insert failed",
+                () -> packages.save(record));
+    }
+
+    public PackageRecord updateForCli(PackageRecord record) {
+        return run("update", "Package record updated", "Package record update failed",
+                () -> packages.save(record));
+    }
+
+    public Optional<PackageRecord> findByIdForCli(Long id) {
+        return run("find_package_by_id", "Package record read", "Package record read failed",
+                () -> packages.findById(id));
+    }
+
+    public boolean existsByTrackingCodeForCli(String trackingCode) {
+        return run("check_tracking_code", "Tracking code checked", "Tracking code check failed",
+                () -> packages.existsByTrackingCode(trackingCode));
+    }
+
+    public boolean existsByTrackingCodeAndIdNotForCli(String trackingCode, Long id) {
+        return run("check_tracking_code", "Tracking code checked", "Tracking code check failed",
+                () -> packages.existsByTrackingCodeAndIdNot(trackingCode, id));
+    }
+
     public Optional<PackageRecord> findById(Long id) {
         return run("find_package_by_id", "Package record read", "Package record read failed",
                 () -> packages.findById(id));

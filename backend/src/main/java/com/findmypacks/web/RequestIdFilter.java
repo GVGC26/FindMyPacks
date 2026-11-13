@@ -69,6 +69,12 @@ public class RequestIdFilter extends OncePerRequestFilter {
         if (uri.startsWith("/api/web/records/") && "DELETE".equals(method)) {
             return "delete";
         }
+        if ("/api/cli/records".equals(uri) && "POST".equals(method)) {
+            return "create";
+        }
+        if (uri.startsWith("/api/cli/records/") && "PUT".equals(method)) {
+            return "update";
+        }
 
         return switch (request.getRequestURI()) {
             case "/api/web/health" -> "health";
