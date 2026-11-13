@@ -41,6 +41,33 @@ Invoke-RestMethod -Uri http://localhost:8080/api/web/login -Method Post -WebSess
   -Body (@{ username = "findmypacksadmin"; password = "findmypacksadmin" } | ConvertTo-Json)
 ```
 
+## Command-line interface (Issue #7)
+
+The CLI uses the REST API and never connects directly to PostgreSQL. Keep the application running and execute every CLI command through Docker Compose:
+
+```sh
+docker compose up --build -d --wait
+docker compose --profile cli run --rm cli help
+docker compose --profile cli run --rm cli health
+docker compose --profile cli run --rm cli token findmypacksadmin findmypacksadmin
+```
+
+The `token` command prints a Bearer token. Put it in `FINDMYPACKS_TOKEN` before using the protected status command:
+
+```sh
+export FINDMYPACKS_TOKEN="token-returned-by-the-command"
+docker compose --profile cli run --rm cli status
+```
+
+PowerShell:
+
+```powershell
+$env:FINDMYPACKS_TOKEN = "token-returned-by-the-command"
+docker compose --profile cli run --rm cli status
+```
+
+`GET /api/cli/health` is public. `POST /api/cli/token` validates the initial username and password. Protected CLI endpoints require `Authorization: Bearer <token>` and return HTTP 401 for a missing or invalid token. Change the development credentials through `APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD`; do not commit real credentials or tokens.
+
 ## Logs and request correlation
 
 Each Web and CLI operation writes a single-line JSON event to stdout with an ISO 8601 UTC timestamp, level, layer, client, operation, status, request ID, and a short message. Database reads made by an operation produce a separate `db` event with the same request ID and client. Successful and failed login attempts are logged without passwords or request payloads. SQL statements and bind values are not logged.
@@ -49,14 +76,13 @@ Each Web and CLI operation writes a single-line JSON event to stdout with an ISO
 docker compose logs -f app
 ```
 
-API responses include an `X-Request-Id` header. Valid IDs supplied by callers are reused; invalid or missing IDs are replaced with a generated ID. To exercise a CLI read against the database, run:
+API responses include an `X-Request-Id` header. Valid IDs supplied by callers are reused; invalid or missing IDs are replaced with a generated ID. To inspect the CLI API and database logs, run:
 
 ```sh
-docker compose --profile cli up --build cli
-docker compose --profile cli logs cli
+docker compose logs -f app
 ```
 
-The CLI reports whether the configured administrator exists. Its `api` and `db` events share a request ID and are retained in the Compose service logs.
+The protected `status` command produces one `api` event and one `db` event with `client` set to `cli` and the same `request_id`. Credentials and tokens are never included in these logs.
 
 ## Run tests
 
