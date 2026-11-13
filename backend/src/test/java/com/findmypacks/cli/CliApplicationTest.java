@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -11,6 +12,7 @@ import java.io.PrintStream;
 import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
 import java.util.Map;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 
 class CliApplicationTest {
@@ -55,6 +57,30 @@ class CliApplicationTest {
         HttpClient client = clientReturning(200, "{\"status\":\"ACTIVE\"}");
         assertThat(cli.run(new String[] {"status"}, Map.of("FINDMYPACKS_TOKEN", "abc"), out, err, client)).isZero();
         assertThat(output.toString()).contains("ACTIVE");
+    }
+
+    @Test
+    void createAndUpdateValidateArgumentsTokenAndSendRequests() throws Exception {
+        assertThat(cli.run(new String[] {"create"}, Map.of(), out, err, mock(HttpClient.class))).isEqualTo(2);
+        assertThat(cli.run(new String[] {"update"}, Map.of(), out, err, mock(HttpClient.class))).isEqualTo(2);
+        String[] create = {"create", "ABC12345", "Maria Silva", "Fortaleza", "CORREIOS", "POSTED", "2026-11-12"};
+        assertThat(cli.run(create, Map.of(), out, err, mock(HttpClient.class))).isEqualTo(2);
+
+        HttpClient createClient = clientReturning(201, "{\"id\":1}");
+        assertThat(cli.run(create, Map.of("FINDMYPACKS_TOKEN", "abc"), out, err, createClient)).isZero();
+        ArgumentCaptor<java.net.http.HttpRequest> createRequest = ArgumentCaptor.forClass(java.net.http.HttpRequest.class);
+        verify(createClient).send(createRequest.capture(), any(HttpResponse.BodyHandler.class));
+        assertThat(createRequest.getValue().method()).isEqualTo("POST");
+        assertThat(createRequest.getValue().uri().getPath()).isEqualTo("/api/cli/records");
+        assertThat(createRequest.getValue().headers().firstValue("Authorization")).contains("Bearer abc");
+
+        String[] update = {"update", "1", "NEW12345", "Maria Silva", "Recife", "JADLOG", "IN_TRANSIT", "2026-11-12"};
+        HttpClient updateClient = clientReturning(200, "{\"id\":1}");
+        assertThat(cli.run(update, Map.of("FINDMYPACKS_TOKEN", "abc"), out, err, updateClient)).isZero();
+        ArgumentCaptor<java.net.http.HttpRequest> updateRequest = ArgumentCaptor.forClass(java.net.http.HttpRequest.class);
+        verify(updateClient).send(updateRequest.capture(), any(HttpResponse.BodyHandler.class));
+        assertThat(updateRequest.getValue().method()).isEqualTo("PUT");
+        assertThat(updateRequest.getValue().uri().getPath()).isEqualTo("/api/cli/records/1");
     }
 
     @Test
