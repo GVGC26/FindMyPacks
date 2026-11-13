@@ -83,6 +83,25 @@ The commands call the protected endpoints `POST /api/cli/records` and `PUT /api/
 
 Create and update operations write correlated JSON events for the `api` and `db` layers with `client` set to `cli`. Inspect them with `docker compose logs -f app`; passwords, Bearer tokens, and request bodies are not logged.
 
+## Package listing and deletion through the CLI (Issue #11)
+
+With `FINDMYPACKS_TOKEN` set, list packages five at a time. The page is zero-based; the optional sort field and direction default to `postedAt` and `desc`:
+
+```sh
+docker compose --profile cli run --rm cli list
+docker compose --profile cli run --rm cli list 0 trackingCode asc
+```
+
+Delete a package by its identifier:
+
+```sh
+docker compose --profile cli run --rm cli delete 1
+```
+
+The commands call `GET /api/cli/records?page=0&size=5&sort=trackingCode,asc` and `DELETE /api/cli/records/{id}`. Both require a valid Bearer token and return HTTP 401 without it. Deleting an unknown identifier returns HTTP 404. Deletions use the same PostgreSQL records as the Web application and therefore disappear from the Web list.
+
+List and delete operations produce correlated JSON events in the API and database layers with `client` set to `cli`. View them with `docker compose logs -f app`.
+
 ## Logs and request correlation
 
 Each Web and CLI operation writes a single-line JSON event to stdout with an ISO 8601 UTC timestamp, level, layer, client, operation, status, request ID, and a short message. Database reads made by an operation produce a separate `db` event with the same request ID and client. Successful and failed login attempts are logged without passwords or request payloads. SQL statements and bind values are not logged.
