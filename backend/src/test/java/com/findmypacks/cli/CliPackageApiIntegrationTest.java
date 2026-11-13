@@ -3,6 +3,8 @@ package com.findmypacks.cli;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -77,6 +79,40 @@ class CliPackageApiIntegrationTest {
 
         mockMvc.perform(put(URL + "/999999").header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON).content(payload("NEW12345")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Package not found"));
+    }
+
+    @Test
+    void listPaginatesAndSortsPackagesAndRequiresBearer() throws Exception {
+        for (int index = 6; index >= 1; index--) {
+            packages.save(record("LIST000" + index));
+        }
+
+        mockMvc.perform(get(URL)).andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get(URL).header("Authorization", "Bearer " + token())
+                        .param("page", "0").param("size", "5")
+                        .param("sort", "trackingCode,asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(5))
+                .andExpect(jsonPath("$.content[0].trackingCode").value("LIST0001"))
+                .andExpect(jsonPath("$.totalElements").value(6));
+    }
+
+    @Test
+    void deleteRemovesPackageAndHandlesAuthenticationAndMissingIds() throws Exception {
+        PackageRecord saved = packages.save(record("DELETE01"));
+
+        mockMvc.perform(delete(URL + "/" + saved.getId())).andExpect(status().isUnauthorized());
+
+        String token = token();
+        mockMvc.perform(delete(URL + "/" + saved.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+        assertThat(packages.existsById(saved.getId())).isFalse();
+
+        mockMvc.perform(delete(URL + "/999999").header("Authorization", "Bearer " + token))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Package not found"));
     }

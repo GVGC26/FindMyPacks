@@ -84,6 +84,31 @@ class CliApplicationTest {
     }
 
     @Test
+    void listAndDeleteValidateArgumentsTokenAndSendRequests() throws Exception {
+        assertThat(cli.run(new String[] {"list", "0", "postedAt", "desc", "extra"},
+                Map.of(), out, err, mock(HttpClient.class))).isEqualTo(2);
+        assertThat(cli.run(new String[] {"delete"}, Map.of(), out, err, mock(HttpClient.class))).isEqualTo(2);
+        assertThat(cli.run(new String[] {"list"}, Map.of(), out, err, mock(HttpClient.class))).isEqualTo(2);
+
+        HttpClient listClient = clientReturning(200, "{\"content\":[]}");
+        assertThat(cli.run(new String[] {"list", "1", "trackingCode", "asc"},
+                Map.of("FINDMYPACKS_TOKEN", "abc"), out, err, listClient)).isZero();
+        ArgumentCaptor<java.net.http.HttpRequest> listRequest = ArgumentCaptor.forClass(java.net.http.HttpRequest.class);
+        verify(listClient).send(listRequest.capture(), any(HttpResponse.BodyHandler.class));
+        assertThat(listRequest.getValue().method()).isEqualTo("GET");
+        assertThat(listRequest.getValue().uri().getQuery())
+                .isEqualTo("page=1&size=5&sort=trackingCode,asc");
+
+        HttpClient deleteClient = clientReturning(204, "");
+        assertThat(cli.run(new String[] {"delete", "7"}, Map.of("FINDMYPACKS_TOKEN", "abc"),
+                out, err, deleteClient)).isZero();
+        ArgumentCaptor<java.net.http.HttpRequest> deleteRequest = ArgumentCaptor.forClass(java.net.http.HttpRequest.class);
+        verify(deleteClient).send(deleteRequest.capture(), any(HttpResponse.BodyHandler.class));
+        assertThat(deleteRequest.getValue().method()).isEqualTo("DELETE");
+        assertThat(deleteRequest.getValue().uri().getPath()).isEqualTo("/api/cli/records/7");
+    }
+
+    @Test
     void reportsHttpConnectionInterruptionAndUnknownCommand() throws Exception {
         assertThat(cli.run(new String[] {"unknown"}, Map.of(), out, err, mock(HttpClient.class))).isEqualTo(2);
         assertThat(errors.toString()).contains("Unknown command");
