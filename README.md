@@ -175,6 +175,16 @@ A successful response looks like this:
 
 To edit, send the same body with `-Method Put` to `http://localhost:8080/api/web/records/1`.
 
+## Dashboard (issue #6)
+
+After signing in, the dashboard requests `GET /api/web/dashboard` and displays three charts based on persisted `packages` records:
+
+- **Packages by status:** count of every package in the database, grouped by its current status.
+- **Packages by carrier:** count of every package in the database, grouped by carrier.
+- **Posts in the last 7 days:** number of packages by `postedAt` date, from today minus six days through today. Days with no packages are shown as zero.
+
+The API computes these aggregates directly from PostgreSQL; the browser fetches them on sign-in/page load, and refreshes them after a package is created or edited. Use **Atualizar** to fetch the latest values without reloading the page. The endpoint requires an authenticated session and returns `byStatus`, `byCarrier`, and `postedPerDay` arrays.
+
 ### Logs for these operations
 
 Registering a package logs an `api` event with the operation `create`, and editing logs `update`. The same request also produces `db` events with the same `request_id`: `check_tracking_code`, `find_package_by_id` (edit only), and `insert` or `update`. To follow one request, reuse the `X-Request-Id` header and filter the logs:

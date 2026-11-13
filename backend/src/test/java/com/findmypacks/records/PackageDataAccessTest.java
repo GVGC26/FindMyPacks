@@ -8,6 +8,8 @@ import static org.mockito.Mockito.when;
 
 import com.findmypacks.logging.StructuredOperationLogger;
 import com.findmypacks.logging.StructuredOperationLogger.Level;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,5 +68,39 @@ class PackageDataAccessTest {
 
         assertThatThrownBy(() -> dataAccess.insert(record)).isSameAs(failure);
         verify(operationLogger).log(Level.ERROR, "db", "insert", "error", "Package record insert failed");
+    }
+
+    @Test
+    void buildsDashboardSummaryWithZeroCountDates() {
+        LocalDate from = LocalDate.of(2026, 11, 10);
+        LocalDate middle = from.plusDays(1);
+        LocalDate to = from.plusDays(2);
+        when(repository.countPostedBetween(from, to))
+                .thenReturn(List.of(new DashboardDayCount(middle, 2L)));
+        when(repository.countByStatus()).thenReturn(List.of(new DashboardCount("POSTED", 2L)));
+        when(repository.countByCarrier()).thenReturn(List.of(new DashboardCount("CORREIOS", 2L)));
+
+        DashboardSummary result = dataAccess.dashboardSummary(from, to);
+
+        assertThat(result.byStatus()).containsExactly(new DashboardCount("POSTED", 2L));
+        assertThat(result.byCarrier()).containsExactly(new DashboardCount("CORREIOS", 2L));
+        assertThat(result.postedPerDay()).containsExactly(
+                new DashboardDayCount(from, 0L),
+                new DashboardDayCount(middle, 2L),
+                new DashboardDayCount(to, 0L));
+        verify(operationLogger).log(
+                Level.INFO, "db", "dashboard_summary", "success", "Package dashboard summary read");
+    }
+
+    @Test
+    void logsAndRethrowsDashboardQueryFailures() {
+        LocalDate from = LocalDate.of(2026, 11, 10);
+        LocalDate to = from.plusDays(6);
+        IllegalStateException failure = new IllegalStateException("database unavailable");
+        when(repository.countPostedBetween(from, to)).thenThrow(failure);
+
+        assertThatThrownBy(() -> dataAccess.dashboardSummary(from, to)).isSameAs(failure);
+        verify(operationLogger).log(
+                Level.ERROR, "db", "dashboard_summary", "error", "Package dashboard summary read failed");
     }
 }

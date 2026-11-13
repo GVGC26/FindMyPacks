@@ -2,7 +2,11 @@ package com.findmypacks.records;
 
 import com.findmypacks.logging.StructuredOperationLogger;
 import com.findmypacks.logging.StructuredOperationLogger.Level;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.function.Supplier;
 import org.springframework.stereotype.Service;
 
@@ -39,6 +43,21 @@ public class PackageDataAccess {
     public boolean existsByTrackingCodeAndIdNot(String trackingCode, Long id) {
         return run("check_tracking_code", "Tracking code checked", "Tracking code check failed",
                 () -> packages.existsByTrackingCodeAndIdNot(trackingCode, id));
+    }
+
+    public DashboardSummary dashboardSummary(LocalDate from, LocalDate to) {
+        return run("dashboard_summary", "Package dashboard summary read", "Package dashboard summary read failed",
+                () -> {
+                    Map<LocalDate, Long> countByDate = packages.countPostedBetween(from, to).stream()
+                            .collect(Collectors.toMap(DashboardDayCount::date, DashboardDayCount::count));
+                    List<DashboardDayCount> postedPerDay = from.datesUntil(to.plusDays(1))
+                            .map(date -> new DashboardDayCount(date, countByDate.getOrDefault(date, 0L)))
+                            .toList();
+                    return new DashboardSummary(
+                            packages.countByStatus(),
+                            packages.countByCarrier(),
+                            postedPerDay);
+                });
     }
 
     private <T> T run(String operation, String successMessage, String errorMessage, Supplier<T> action) {

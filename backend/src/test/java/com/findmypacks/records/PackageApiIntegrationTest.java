@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -215,6 +216,38 @@ class PackageApiIntegrationTest {
                 .andExpect(status().isUnauthorized());
 
         assertThat(packages.findById(existing.getId()).orElseThrow().getTrackingCode()).isEqualTo("ABC12345");
+    }
+
+    @Test
+    void dashboardReturnsPersistedPackageCountsAndSevenDays() throws Exception {
+        LocalDate today = LocalDate.now();
+        packages.save(new PackageRecord(
+                "ABC12345", "Maria Silva", "Fortaleza", "CORREIOS", "POSTED", today));
+        packages.save(new PackageRecord(
+                "DEF12345", "João Souza", "Recife", "JADLOG", "DELIVERED", today));
+        packages.save(new PackageRecord(
+                "GHI12345", "Ana Lima", "Natal", "LOGGI", "DELIVERED", today.minusDays(7)));
+
+        mockMvc.perform(get("/api/web/dashboard").with(admin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.byStatus.length()").value(2))
+                .andExpect(jsonPath("$.byStatus[0].label").value("DELIVERED"))
+                .andExpect(jsonPath("$.byStatus[0].count").value(2))
+                .andExpect(jsonPath("$.byStatus[1].label").value("POSTED"))
+                .andExpect(jsonPath("$.byCarrier.length()").value(3))
+                .andExpect(jsonPath("$.byCarrier[0].label").value("CORREIOS"))
+                .andExpect(jsonPath("$.byCarrier[0].count").value(1))
+                .andExpect(jsonPath("$.postedPerDay.length()").value(7))
+                .andExpect(jsonPath("$.postedPerDay[0].date").value(today.minusDays(6).toString()))
+                .andExpect(jsonPath("$.postedPerDay[0].count").value(0))
+                .andExpect(jsonPath("$.postedPerDay[6].date").value(today.toString()))
+                .andExpect(jsonPath("$.postedPerDay[6].count").value(2));
+    }
+
+    @Test
+    void dashboardRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/web/dashboard"))
+                .andExpect(status().isUnauthorized());
     }
 
     // ---------- Tratamento de erros ----------
