@@ -177,6 +177,12 @@ The list endpoint supports Spring pagination and sorting parameters. The Web pag
 
 Both endpoints require an authenticated session. The delete request also sends the CSRF token in the `X-XSRF-TOKEN` header. A list request returns HTTP 401 without a valid session; deleting an unknown ID returns HTTP 404. List and delete requests are recorded in the API logs, and their database reads/writes are logged with the same request ID.
 
+## Advanced package search (issue #4)
+
+The authenticated Web search endpoint is `GET /api/web/records/search`. It accepts any combination of `trackingCode`, `customer`, `destination`, `carrier`, and `status`; tracking code, customer, and destination match partial text without case sensitivity, while carrier and status match their allowed values without case sensitivity. Blank filters are ignored. The response uses the same page structure as the list endpoint, so `page`, `size`, and `sort` work together with the filters. Invalid carrier/status values or malformed paging parameters return HTTP 400; a request without a session returns HTTP 401.
+
+Example: `GET /api/web/records/search?customer=maria&status=IN_TRANSIT&page=0&size=5&sort=postedAt,desc`. Each search emits correlated `api` and `db` JSON logs using operation `search_packages`.
+
 The frontend behavior is covered by `PackageList.test.tsx`. Backend coverage is in `PackageListingApiIntegrationTest` and `PackageListingDataAccessTest`.
 
 ### Endpoints
