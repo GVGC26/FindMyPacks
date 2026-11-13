@@ -1,5 +1,6 @@
 package com.findmypacks.records;
 
+import com.findmypacks.cli.CliController;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -12,7 +13,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
-@RestControllerAdvice(assignableTypes = PackageController.class)
+@RestControllerAdvice(assignableTypes = {PackageController.class, CliController.class})
 public class PackageExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

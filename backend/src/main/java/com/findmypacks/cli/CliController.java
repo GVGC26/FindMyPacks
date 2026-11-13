@@ -1,5 +1,9 @@
 package com.findmypacks.cli;
 
+import com.findmypacks.records.PackageDataAccess;
+import com.findmypacks.records.PackageRecord;
+import com.findmypacks.records.PackageRequest;
+import com.findmypacks.records.PackageResponse;
 import com.findmypacks.user.AppUserDataAccess;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -23,6 +27,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,11 +41,17 @@ public class CliController {
     private final AuthenticationManager authenticationManager;
     private final TokenRegistry tokens;
     private final AppUserDataAccess users;
+    private final PackageDataAccess packages;
 
-    public CliController(AuthenticationManager authenticationManager, TokenRegistry tokens, AppUserDataAccess users) {
+    public CliController(
+            AuthenticationManager authenticationManager,
+            TokenRegistry tokens,
+            AppUserDataAccess users,
+            PackageDataAccess packages) {
         this.authenticationManager = authenticationManager;
         this.tokens = tokens;
         this.users = users;
+        this.packages = packages;
     }
 
     @GetMapping("/health")
@@ -58,6 +70,35 @@ public class CliController {
     public StatusResponse status(Authentication authentication) {
         boolean exists = users.findByUsername(authentication.getName()).isPresent();
         return new StatusResponse(authentication.getName(), exists ? "ACTIVE" : "MISSING");
+    }
+
+    @PostMapping("/records")
+    public ResponseEntity<PackageResponse> create(@Valid @RequestBody PackageRequest request) {
+        if (packages.existsByTrackingCodeForCli(request.trackingCode())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.CONFLICT, "Tracking code already registered");
+        }
+        PackageRecord saved = packages.insertForCli(record(request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(PackageResponse.from(saved));
+    }
+
+    @PutMapping("/records/{id}")
+    public PackageResponse update(@PathVariable Long id, @Valid @RequestBody PackageRequest request) {
+        PackageRecord record = packages.findByIdForCli(id)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Package not found"));
+        if (packages.existsByTrackingCodeAndIdNotForCli(request.trackingCode(), id)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.CONFLICT, "Tracking code already registered");
+        }
+        record.update(request.trackingCode(), request.customer(), request.destination(),
+                request.carrier(), request.status(), request.postedAt());
+        return PackageResponse.from(packages.updateForCli(record));
+    }
+
+    private PackageRecord record(PackageRequest request) {
+        return new PackageRecord(request.trackingCode(), request.customer(), request.destination(),
+                request.carrier(), request.status(), request.postedAt());
     }
 
     public record TokenRequest(@NotBlank String username, @NotBlank String password) {

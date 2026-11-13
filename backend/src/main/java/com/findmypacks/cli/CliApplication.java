@@ -18,6 +18,10 @@ public class CliApplication {
               health                       Check API availability
               token <username> <password>  Obtain a Bearer token
               status                       Check the authenticated user
+              create <trackingCode> <customer> <destination> <carrier> <status> <postedAt>
+                                           Register a package
+              update <id> <trackingCode> <customer> <destination> <carrier> <status> <postedAt>
+                                           Edit a package
 
             Environment:
               FINDMYPACKS_API_URL  API URL (default: http://app:8080)
@@ -34,9 +38,13 @@ public class CliApplication {
         try {
             return switch (command) {
                 case "help", "--help", "-h" -> printHelp(out);
-                case "health" -> request(client, request(baseUrl + "/api/cli/health", null, null), out, err);
+                case "health" -> request(client, request(baseUrl + "/api/cli/health", "GET", null, null), out, err);
                 case "token" -> token(args, baseUrl, client, out, err);
                 case "status" -> protectedStatus(environment, baseUrl, client, out, err);
+                case "create" -> writeRecord(args, 7, "POST", "/api/cli/records", environment,
+                        baseUrl, client, out, err);
+                case "update" -> writeRecord(args, 8, "PUT", "/api/cli/records/" + argument(args, 1), environment,
+                        baseUrl, client, out, err);
                 default -> unknown(command, err);
             };
         } catch (IOException exception) {
@@ -61,7 +69,7 @@ public class CliApplication {
             return 2;
         }
         String body = "{\"username\":\"" + json(args[1]) + "\",\"password\":\"" + json(args[2]) + "\"}";
-        return request(client, request(baseUrl + "/api/cli/token", body, null), out, err);
+        return request(client, request(baseUrl + "/api/cli/token", "POST", body, null), out, err);
     }
 
     private int protectedStatus(
@@ -75,20 +83,55 @@ public class CliApplication {
             err.println("Set FINDMYPACKS_TOKEN before using protected commands");
             return 2;
         }
-        return request(client, request(baseUrl + "/api/cli/status", null, token), out, err);
+        return request(client, request(baseUrl + "/api/cli/status", "GET", null, token), out, err);
     }
 
-    private HttpRequest request(String url, String body, String token) {
+    private int writeRecord(
+            String[] args,
+            int expectedArguments,
+            String method,
+            String path,
+            Map<String, String> environment,
+            String baseUrl,
+            HttpClient client,
+            PrintStream out,
+            PrintStream err) throws IOException, InterruptedException {
+        if (args.length != expectedArguments) {
+            err.println(method.equals("POST")
+                    ? "Usage: create <trackingCode> <customer> <destination> <carrier> <status> <postedAt>"
+                    : "Usage: update <id> <trackingCode> <customer> <destination> <carrier> <status> <postedAt>");
+            return 2;
+        }
+        String token = environment.get("FINDMYPACKS_TOKEN");
+        if (token == null || token.isBlank()) {
+            err.println("Set FINDMYPACKS_TOKEN before using protected commands");
+            return 2;
+        }
+        int firstField = method.equals("POST") ? 1 : 2;
+        String body = "{\"trackingCode\":\"" + json(args[firstField])
+                + "\",\"customer\":\"" + json(args[firstField + 1])
+                + "\",\"destination\":\"" + json(args[firstField + 2])
+                + "\",\"carrier\":\"" + json(args[firstField + 3])
+                + "\",\"status\":\"" + json(args[firstField + 4])
+                + "\",\"postedAt\":\"" + json(args[firstField + 5]) + "\"}";
+        return request(client, request(baseUrl + path, method, body, token), out, err);
+    }
+
+    private String argument(String[] args, int index) {
+        return args.length > index ? args[index] : "";
+    }
+
+    private HttpRequest request(String url, String method, String body, String token) {
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(url))
                 .header("Accept", "application/json");
         if (token != null) {
             request.header("Authorization", "Bearer " + token);
         }
-        if (body == null) {
-            request.GET();
-        } else {
+        if (body != null) {
             request.header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(body));
+                    .method(method, HttpRequest.BodyPublishers.ofString(body));
+        } else {
+            request.method(method, HttpRequest.BodyPublishers.noBody());
         }
         return request.build();
     }
