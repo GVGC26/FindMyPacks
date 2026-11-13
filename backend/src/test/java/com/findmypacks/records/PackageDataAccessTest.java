@@ -62,6 +62,20 @@ class PackageDataAccessTest {
     }
 
     @Test
+    void supportsCliCreateAndUpdateOperations() {
+        when(repository.save(record)).thenReturn(record);
+        when(repository.findById(1L)).thenReturn(Optional.of(record));
+        when(repository.existsByTrackingCode("CLI12345")).thenReturn(false);
+        when(repository.existsByTrackingCodeAndIdNot("CLI12345", 1L)).thenReturn(false);
+
+        assertThat(dataAccess.insertForCli(record)).isSameAs(record);
+        assertThat(dataAccess.updateForCli(record)).isSameAs(record);
+        assertThat(dataAccess.findByIdForCli(1L)).contains(record);
+        assertThat(dataAccess.existsByTrackingCodeForCli("CLI12345")).isFalse();
+        assertThat(dataAccess.existsByTrackingCodeAndIdNotForCli("CLI12345", 1L)).isFalse();
+    }
+
+    @Test
     void logsAndRethrowsFailures() {
         IllegalStateException failure = new IllegalStateException("database unavailable");
         when(repository.save(record)).thenThrow(failure);
