@@ -68,6 +68,21 @@ docker compose --profile cli run --rm cli status
 
 `GET /api/cli/health` is public. `POST /api/cli/token` validates the initial username and password. Protected CLI endpoints require `Authorization: Bearer <token>` and return HTTP 401 for a missing or invalid token. Change the development credentials through `APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD`; do not commit real credentials or tokens.
 
+## Package registration and editing through the CLI (Issue #9)
+
+The CLI uses the same six fields and validation rules documented in the Web package form. Set `FINDMYPACKS_TOKEN`, then run:
+
+```sh
+docker compose --profile cli run --rm cli create BR12345678 "Maria Silva" Fortaleza CORREIOS POSTED 2026-11-12
+docker compose --profile cli run --rm cli update 1 BR12345678 "Maria Souza" Recife JADLOG IN_TRANSIT 2026-11-12
+```
+
+The arguments are, in order: tracking code, customer, destination, carrier, status, and posting date. The `update` command also receives the package ID before those fields. Quote customer or destination values that contain spaces.
+
+The commands call the protected endpoints `POST /api/cli/records` and `PUT /api/cli/records/{id}`. They return HTTP 401 without a valid Bearer token, HTTP 400 for invalid fields, HTTP 404 when an update ID does not exist, and HTTP 409 for a duplicated tracking code. Saved records use the same PostgreSQL table as the Web application, so they are visible in the Web list immediately.
+
+Create and update operations write correlated JSON events for the `api` and `db` layers with `client` set to `cli`. Inspect them with `docker compose logs -f app`; passwords, Bearer tokens, and request bodies are not logged.
+
 ## Logs and request correlation
 
 Each Web and CLI operation writes a single-line JSON event to stdout with an ISO 8601 UTC timestamp, level, layer, client, operation, status, request ID, and a short message. Database reads made by an operation produce a separate `db` event with the same request ID and client. Successful and failed login attempts are logged without passwords or request payloads. SQL statements and bind values are not logged.
