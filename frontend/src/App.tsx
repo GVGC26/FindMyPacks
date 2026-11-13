@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import Dashboard from "./Dashboard";
 import PackageForm from "./PackageForm";
 
 type LoginResult = {
@@ -17,6 +18,44 @@ export default function App() {
   const [error, setError] = useState("");
   const [signedInAs, setSignedInAs] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function restoreSession() {
+      try {
+        const response = await fetch("/api/web/session", { signal: controller.signal });
+        if (response.status === 401) {
+          return;
+        }
+        if (!response.ok) {
+          throw new Error("Não foi possível verificar sua sessão.");
+        }
+
+        const session = (await response.json()) as LoginResult;
+        if (!controller.signal.aborted) {
+          setSignedInAs(session.username);
+        }
+      } catch (sessionError) {
+        if (!controller.signal.aborted) {
+          setError(
+            sessionError instanceof Error
+              ? sessionError.message
+              : "Não foi possível verificar sua sessão.",
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsCheckingSession(false);
+        }
+      }
+    }
+
+    void restoreSession();
+    return () => controller.abort();
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -78,7 +117,12 @@ export default function App() {
           <p className="welcome-note" role="status">
             Bem-vindo, {signedInAs}.
           </p>
-          <PackageForm />
+          <Dashboard refreshKey={dashboardRefreshKey} />
+          <PackageForm onSaved={() => setDashboardRefreshKey((current) => current + 1)} />
+        </main>
+      ) : isCheckingSession ? (
+        <main className="session-loading" role="status">
+          Verificando sessão...
         </main>
       ) : (
         <main className="hero">

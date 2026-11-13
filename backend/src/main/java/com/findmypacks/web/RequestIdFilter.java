@@ -68,6 +68,8 @@ public class RequestIdFilter extends OncePerRequestFilter {
             case "/api/web/health" -> "health";
             case "/api/web/csrf" -> "csrf";
             case "/api/web/login" -> "login";
+            case "/api/web/session" -> "session";
+            case "/api/web/dashboard" -> "dashboard";
             case "/api/cli/health" -> "health";
             case "/api/cli/token" -> "token";
             case "/api/cli/status" -> "status";
