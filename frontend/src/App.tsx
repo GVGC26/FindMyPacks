@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import Dashboard from "./Dashboard";
 import PackageForm from "./PackageForm";
+import PackageList from "./PackageList";
+import type { PackageRecord } from "./PackageForm";
 
 type LoginResult = {
   username: string;
@@ -19,6 +21,8 @@ export default function App() {
   const [signedInAs, setSignedInAs] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
+  const [editingRecord, setEditingRecord] = useState<PackageRecord | null>(null);
+  const [refreshPackages, setRefreshPackages] = useState(0);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   useEffect(() => {
@@ -118,7 +122,14 @@ export default function App() {
             Bem-vindo, {signedInAs}.
           </p>
           <Dashboard refreshKey={dashboardRefreshKey} />
-          <PackageForm onSaved={() => setDashboardRefreshKey((current) => current + 1)} />
+          <PackageForm
+            initialRecord={editingRecord}
+            onSaved={() => {
+              setDashboardRefreshKey((current) => current + 1);
+              setRefreshPackages((current) => current + 1);
+            }}
+          />
+          <PackageList onEdit={setEditingRecord} refreshKey={refreshPackages} />
         </main>
       ) : isCheckingSession ? (
         <main className="session-loading" role="status">

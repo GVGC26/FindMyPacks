@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.function.Supplier;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -33,6 +35,18 @@ public class PackageDataAccess {
     public Optional<PackageRecord> findById(Long id) {
         return run("find_package_by_id", "Package record read", "Package record read failed",
                 () -> packages.findById(id));
+    }
+
+    public Page<PackageRecord> findAll(Pageable pageable) {
+        return run("list", "Package records listed", "Package records list failed",
+                () -> packages.findAll(pageable));
+    }
+
+    public void deleteById(Long id) {
+        run("delete", "Package record deleted", "Package record delete failed", () -> {
+            packages.deleteById(id);
+            return null;
+        });
     }
 
     public boolean existsByTrackingCode(String trackingCode) {
