@@ -31,7 +31,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
             FilterChain filterChain) throws ServletException, IOException {
         String requestId = requestIdFrom(request);
         MDC.put("request_id", requestId);
-        MDC.put("client", "web");
+        MDC.put("client", clientFor(request));
         response.setHeader(HEADER_NAME, requestId);
         try {
             filterChain.doFilter(request, response);
@@ -43,7 +43,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
                 int statusCode = response.getStatus();
                 String status = statusCode >= 400 ? "error" : "success";
                 Level level = statusCode >= 500 ? Level.ERROR : statusCode >= 400 ? Level.WARN : Level.INFO;
-                operationLogger.log(level, "api", operationFor(request), status, "Web operation completed");
+                operationLogger.log(level, "api", operationFor(request), status, "API operation completed");
             } finally {
                 MDC.remove("request_id");
                 MDC.remove("client");
@@ -56,8 +56,15 @@ public class RequestIdFilter extends OncePerRequestFilter {
             case "/api/web/health" -> "health";
             case "/api/web/csrf" -> "csrf";
             case "/api/web/login" -> "login";
+            case "/api/cli/health" -> "health";
+            case "/api/cli/token" -> "token";
+            case "/api/cli/status" -> "status";
             default -> request.getMethod().toLowerCase(Locale.ROOT) + "_" + request.getRequestURI();
         };
+    }
+
+    private String clientFor(HttpServletRequest request) {
+        return request.getRequestURI().startsWith("/api/cli/") ? "cli" : "web";
     }
 
     private String requestIdFrom(HttpServletRequest request) {
