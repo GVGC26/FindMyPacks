@@ -1,0 +1,83 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: findmypacks
+      POSTGRES_USER: findmypacks
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-findmypacks-dev}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U findmypacks -d findmypacks"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      target: app
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/findmypacks
+      SPRING_DATASOURCE_USERNAME: findmypacks
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-findmypacks-dev}
+      APP_ADMIN_USERNAME: ${APP_ADMIN_USERNAME:-findmypacksadmin}
+      APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-findmypacksadmin}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/web/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+
+  cli:
+    build:
+      context: .
+      target: app
+    profiles: ["cli"]
+    environment:
+      FINDMYPACKS_API_URL: http://app:8080
+      FINDMYPACKS_TOKEN: ${FINDMYPACKS_TOKEN:-}
+    entrypoint:
+      - java
+      - -Dloader.main=com.findmypacks.cli.CliApplication
+      - -cp
+      - /app/app.jar
+      - org.springframework.boot.loader.launch.PropertiesLauncher
+    command: ["help"]
+    healthcheck:
+      disable: true
+    depends_on:
+      app:
+        condition: service_healthy
+
+  tests:
+    build:
+      context: .
+      target: tests
+    profiles: ["test"]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/findmypacks
+      SPRING_DATASOURCE_USERNAME: findmypacks
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-findmypacks-dev}
+      APP_ADMIN_USERNAME: ${APP_ADMIN_USERNAME:-findmypacksadmin}
+      APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-findmypacksadmin}
+    volumes:
+      - ./backend:/workspace/backend
+      - ./frontend:/workspace/frontend
+      - frontend_node_modules:/workspace/frontend/node_modules
+      - maven_cache:/root/.m2
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  frontend_node_modules:
+  maven_cache:
