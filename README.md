@@ -128,6 +128,23 @@ To inspect the stored data:
 docker compose exec db psql -U findmypacks -d findmypacks -c "SELECT * FROM packages;"
 ```
 
+## Package listing and deletion (issue #3)
+
+After signing in, the home page loads packages from the database and displays them in a table. The table shows the tracking code, customer, destination, and posting date. It displays five packages per page and includes previous/next controls and the total number of records. Use the column headings for tracking code, customer, destination, or posting date to sort the results; clicking the active heading again reverses the sort direction.
+
+Select individual rows with their checkboxes, or select all rows on the current page with the checkbox in the table heading. Click **Excluir selecionados** and confirm to delete the selected packages. The list reloads after deletion. Click **Editar** on a row to load that package in the registration form above.
+
+The list endpoint supports Spring pagination and sorting parameters. The Web page requests five rows at a time:
+
+| Operation | Method and path | Success |
+|---|---|---|
+| List packages | `GET /api/web/records?page=0&size=5&sort=postedAt,desc` | `200` with a paginated JSON response |
+| Delete a package | `DELETE /api/web/records/{id}` | `204` with no response body |
+
+Both endpoints require an authenticated session. The delete request also sends the CSRF token in the `X-XSRF-TOKEN` header. A list request returns HTTP 401 without a valid session; deleting an unknown ID returns HTTP 404. List and delete requests are recorded in the API logs, and their database reads/writes are logged with the same request ID.
+
+The frontend behavior is covered by `PackageList.test.tsx`. Backend coverage is in `PackageListingApiIntegrationTest` and `PackageListingDataAccessTest`.
+
 ### Endpoints
 
 Both endpoints require an authenticated session and a CSRF token (`GET /api/web/csrf`, sent in the `X-XSRF-TOKEN` header). Requests without a valid session receive HTTP 401. The JSON body uses the camelCase field names from the table above.
