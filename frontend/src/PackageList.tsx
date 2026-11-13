@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import type { PackageRecord } from "./PackageForm";
 
 type PageResult = {
@@ -21,9 +22,19 @@ type PackageListProps = {
   refreshKey: number;
 };
 
+type SearchFilters = {
+  customer: string;
+  status: string;
+  carrier: string;
+};
+
+const EMPTY_FILTERS: SearchFilters = { customer: "", status: "", carrier: "" };
+
 export default function PackageList({ onEdit, refreshKey }: PackageListProps) {
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState("postedAt,desc");
+  const [filters, setFilters] = useState<SearchFilters>(EMPTY_FILTERS);
+  const [activeFilters, setActiveFilters] = useState<SearchFilters>(EMPTY_FILTERS);
   const [result, setResult] = useState<PageResult | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +46,14 @@ export default function PackageList({ onEdit, refreshKey }: PackageListProps) {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(`/api/web/records?page=${page}&size=${PAGE_SIZE}&sort=${sort}`);
+      const filterParams = new URLSearchParams();
+      Object.entries(activeFilters).forEach(([key, value]) => {
+        if (value.trim()) filterParams.set(key, value.trim());
+      });
+      const hasFilters = Object.values(activeFilters).some((value) => value.trim().length > 0);
+      const endpoint = hasFilters ? "/api/web/records/search" : "/api/web/records";
+      const query = `page=${page}&size=${PAGE_SIZE}&sort=${sort}${hasFilters ? `&${filterParams.toString()}` : ""}`;
+      const response = await fetch(`${endpoint}?${query}`);
       if (response.status === 401) throw new Error("Sua sessão expirou. Entre novamente.");
       if (!response.ok) throw new Error("Não foi possível carregar os pacotes.");
       const data = (await response.json()) as PageResult;
@@ -46,13 +64,30 @@ export default function PackageList({ onEdit, refreshKey }: PackageListProps) {
     } finally {
       setLoading(false);
     }
-  }, [page, sort]);
+  }, [activeFilters, page, sort]);
 
   useEffect(() => { void loadPackages(); }, [loadPackages, refreshKey]);
 
   function changeSort(field: string) {
     const [currentField, direction] = sort.split(",");
     setSort(`${field},${currentField === field && direction === "asc" ? "desc" : "asc"}`);
+    setPage(0);
+  }
+
+  function changeFilter(field: keyof SearchFilters, value: string) {
+    setFilters((current) => ({ ...current, [field]: value }));
+    setPage(0);
+  }
+
+  function searchPackages(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPage(0);
+    setActiveFilters({ ...filters });
+  }
+
+  function clearFilters() {
+    setFilters(EMPTY_FILTERS);
+    setActiveFilters(EMPTY_FILTERS);
     setPage(0);
   }
 
@@ -110,6 +145,35 @@ export default function PackageList({ onEdit, refreshKey }: PackageListProps) {
           {deleting ? "Excluindo..." : `Excluir selecionados${selected.length ? ` (${selected.length})` : ""}`}
         </button>
       </div>
+      <form className="search-panel" aria-label="Filtros de busca" onSubmit={searchPackages}>
+        <div className="search-fields">
+          <label className="form-field" htmlFor="search-customer">Cliente
+            <input id="search-customer" aria-label="Filtrar por cliente" onChange={(event) => changeFilter("customer", event.target.value)} placeholder="Nome do cliente" value={filters.customer} />
+          </label>
+          <label className="form-field" htmlFor="search-status">Status
+            <select id="search-status" aria-label="Filtrar por status" onChange={(event) => changeFilter("status", event.target.value)} value={filters.status}>
+              <option value="">Todos os status</option>
+              <option value="POSTED">Postado</option>
+              <option value="IN_TRANSIT">Em trânsito</option>
+              <option value="OUT_FOR_DELIVERY">Saiu para entrega</option>
+              <option value="DELIVERED">Entregue</option>
+            </select>
+          </label>
+          <label className="form-field" htmlFor="search-carrier">Transportadora
+            <select id="search-carrier" aria-label="Filtrar por transportadora" onChange={(event) => changeFilter("carrier", event.target.value)} value={filters.carrier}>
+              <option value="">Todas as transportadoras</option>
+              <option value="CORREIOS">Correios</option>
+              <option value="JADLOG">Jadlog</option>
+              <option value="LOGGI">Loggi</option>
+              <option value="OTHER">Outra</option>
+            </select>
+          </label>
+        </div>
+        <div className="search-actions">
+          <button type="submit">Buscar</button>
+          <button className="secondary-button" onClick={clearFilters} type="button">Limpar filtros</button>
+        </div>
+      </form>
       {error && <p className="error-message" role="alert">{error}</p>}
       {notice && <p className="success-message" role="status">{notice}</p>}
       <div className="table-scroll">
@@ -122,13 +186,13 @@ export default function PackageList({ onEdit, refreshKey }: PackageListProps) {
             <th>Ações</th>
           </tr></thead>
           <tbody>
-            {loading ? <tr><td colSpan={6}>Carregando pacotes...</td></tr> : result?.content.length ? result.content.map((record) => (
+            {loading ? <tr><td colSpan={6}>Carregando pacotes...</td></tr> : error ? <tr><td colSpan={6}>Não foi possível carregar os pacotes.</td></tr> : result?.content.length ? result.content.map((record) => (
               <tr key={record.id}>
                 <td><input aria-label={`Selecionar pacote ${record.trackingCode}`} checked={selected.includes(record.id)} onChange={() => toggleSelected(record.id)} type="checkbox" /></td>
                 <td>{record.trackingCode}</td><td>{record.customer}</td><td>{record.destination}</td><td>{record.postedAt}</td>
                 <td><button className="table-action" onClick={() => onEdit(record)} type="button">Editar</button></td>
               </tr>
-            )) : <tr><td colSpan={6}>Nenhum pacote cadastrado.</td></tr>}
+            )) : <tr><td colSpan={6}>{Object.values(activeFilters).some((value) => value.trim()) ? "Nenhum pacote encontrado." : "Nenhum pacote cadastrado."}</td></tr>}
           </tbody>
         </table>
       </div>

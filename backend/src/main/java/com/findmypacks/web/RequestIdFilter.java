@@ -66,6 +66,9 @@ public class RequestIdFilter extends OncePerRequestFilter {
         if ("/api/web/records".equals(uri) && "GET".equals(method)) {
             return "list";
         }
+        if ("/api/web/records/search".equals(uri) && "GET".equals(method)) {
+            return "search_packages";
+        }
         if (uri.startsWith("/api/web/records/") && "DELETE".equals(method)) {
             return "delete";
         }

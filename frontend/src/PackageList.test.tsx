@@ -102,4 +102,54 @@ describe("PackageList", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Sua sessão expirou. Entre novamente.");
   });
+
+  it("submits customer, status, and carrier filters to the search API", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      return url.includes("/search?") ? pageResponse([records[0]]) : pageResponse(records.slice(0, 5), 0, 6);
+    });
+    render(<PackageList onEdit={vi.fn()} refreshKey={0} />);
+    await screen.findByText("BR12345670");
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Filtrar por cliente" }), { target: { value: "Maria Silva" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Filtrar por status" }), { target: { value: "IN_TRANSIT" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Filtrar por transportadora" }), { target: { value: "JADLOG" } });
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+
+    expect(await screen.findByText("BR12345670")).toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/web/records/search?page=0&size=5&sort=postedAt,desc&customer=Maria+Silva&status=IN_TRANSIT&carrier=JADLOG",
+    ));
+  });
+
+  it("clears filters and restores the complete listing", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      return url.includes("/search?") ? pageResponse([records[0]]) : pageResponse(records.slice(0, 5), 0, 6);
+    });
+    render(<PackageList onEdit={vi.fn()} refreshKey={0} />);
+    await screen.findByText("BR12345670");
+    fireEvent.change(screen.getByRole("textbox", { name: "Filtrar por cliente" }), { target: { value: "Maria" } });
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("/api/web/records/search?")));
+
+    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith("/api/web/records?page=0&size=5&sort=postedAt,desc"));
+    expect(screen.getByRole("textbox", { name: "Filtrar por cliente" })).toHaveValue("");
+    expect(screen.getByRole("combobox", { name: "Filtrar por status" })).toHaveValue("");
+    expect(screen.getByRole("combobox", { name: "Filtrar por transportadora" })).toHaveValue("");
+    expect(screen.getByText("Página 1 de 2")).toBeInTheDocument();
+  });
+
+  it("shows an empty state when search returns no packages", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => pageResponse([], 0, 0));
+    render(<PackageList onEdit={vi.fn()} refreshKey={0} />);
+
+    expect(await screen.findByText("Nenhum pacote cadastrado.")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: "Filtrar por cliente" }), { target: { value: "Inexistente" } });
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+
+    expect(await screen.findByText("Nenhum pacote encontrado.")).toBeInTheDocument();
+  });
 });

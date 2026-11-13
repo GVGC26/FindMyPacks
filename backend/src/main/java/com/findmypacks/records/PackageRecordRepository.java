@@ -5,8 +5,26 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface PackageRecordRepository extends JpaRepository<PackageRecord, Long> {
+
+    @Query("""
+            select p from PackageRecord p
+            where (:trackingCode = '' or lower(p.trackingCode) like concat('%', :trackingCode, '%'))
+              and (:customer = '' or lower(p.customer) like concat('%', :customer, '%'))
+              and (:destination = '' or lower(p.destination) like concat('%', :destination, '%'))
+              and (:carrier = '' or upper(p.carrier) = :carrier)
+              and (:status = '' or upper(p.status) = :status)
+            """)
+    Page<PackageRecord> search(
+            @Param("trackingCode") String trackingCode,
+            @Param("customer") String customer,
+            @Param("destination") String destination,
+            @Param("carrier") String carrier,
+            @Param("status") String status,
+            Pageable pageable);
 
     @Query("select (count(p) > 0) from PackageRecord p where p.trackingCode = ?1")
     boolean existsByTrackingCode(String trackingCode);

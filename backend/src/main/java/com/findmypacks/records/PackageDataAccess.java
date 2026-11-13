@@ -79,6 +79,12 @@ public class PackageDataAccess {
                 () -> packages.findAll(pageable));
     }
 
+    public Page<PackageRecord> search(String trackingCode, String customer, String destination,
+                                      String carrier, String status, Pageable pageable) {
+        return run("search_packages", "Package records searched", "Package records search failed",
+                () -> packages.search(trackingCode, customer, destination, carrier, status, pageable));
+    }
+
     public void deleteById(Long id) {
         run("delete", "Package record deleted", "Package record delete failed", () -> {
             packages.deleteById(id);

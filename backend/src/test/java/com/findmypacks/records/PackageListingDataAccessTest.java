@@ -54,6 +54,26 @@ class PackageListingDataAccessTest {
     }
 
     @Test
+    void searchesPackagesAndLogsSuccessfulDatabaseRead() {
+        var pageable = PageRequest.of(0, 5);
+        var page = new PageImpl<>(List.of(record), pageable, 1);
+        when(repository.search("CODE", "Ana", null, null, null, pageable)).thenReturn(page);
+
+        assertThat(dataAccess.search("CODE", "Ana", null, null, null, pageable)).isSameAs(page);
+        verify(operationLogger).log(Level.INFO, "db", "search_packages", "success", "Package records searched");
+    }
+
+    @Test
+    void logsSearchFailureAndRethrowsIt() {
+        var pageable = PageRequest.of(0, 5);
+        IllegalStateException failure = new IllegalStateException("database unavailable");
+        when(repository.search(null, null, null, null, null, pageable)).thenThrow(failure);
+
+        assertThatThrownBy(() -> dataAccess.search(null, null, null, null, null, pageable)).isSameAs(failure);
+        verify(operationLogger).log(Level.ERROR, "db", "search_packages", "error", "Package records search failed");
+    }
+
+    @Test
     void deletesPackageAndLogsSuccessfulDatabaseWrite() {
         dataAccess.deleteById(7L);
 
