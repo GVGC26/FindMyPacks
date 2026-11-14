@@ -24,7 +24,10 @@ function pageResponse(content: PackageRecord[], number = 0, totalElements = cont
 }
 
 describe("PackageList", () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -151,5 +154,64 @@ describe("PackageList", () => {
     fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
 
     expect(await screen.findByText("Nenhum pacote encontrado.")).toBeInTheDocument();
+  });
+
+  it("exports all packages with the default sort and triggers a CSV download", async () => {
+    const createObjectURL = vi.fn((_blob: Blob) => "blob:packages");
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
+    const clickLink = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+      String(input).includes("/export?")
+        ? new Response("trackingCode,customer", { status: 200 })
+        : pageResponse(records.slice(0, 5), 0, 6));
+    render(<PackageList onEdit={vi.fn()} refreshKey={0} />);
+    await screen.findByText("BR12345670");
+
+    fireEvent.click(screen.getByRole("button", { name: "Exportar CSV" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Pacotes exportados com sucesso.");
+    expect(fetchMock).toHaveBeenLastCalledWith("/api/web/records/export?sort=postedAt,desc");
+    expect(createObjectURL).toHaveBeenCalledOnce();
+    expect(createObjectURL.mock.calls[0][0].size).toBe(21);
+    expect(clickLink).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:packages");
+  });
+
+  it("exports using applied filters and current sort instead of draft filters", async () => {
+    vi.stubGlobal("URL", { createObjectURL: vi.fn(() => "blob:packages"), revokeObjectURL: vi.fn() });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+      String(input).includes("/export?")
+        ? new Response("trackingCode,customer", { status: 200 })
+        : pageResponse(records.slice(0, 5), 0, 6));
+    render(<PackageList onEdit={vi.fn()} refreshKey={0} />);
+    await screen.findByText("BR12345670");
+    fireEvent.change(screen.getByRole("textbox", { name: "Filtrar por cliente" }), { target: { value: "Ana Silva" } });
+    fireEvent.click(screen.getByRole("button", { name: "Buscar" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("/search?")));
+    fireEvent.change(screen.getByRole("textbox", { name: "Filtrar por cliente" }), { target: { value: "Rascunho" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cliente" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("sort=customer,asc")));
+
+    fireEvent.click(screen.getByRole("button", { name: "Exportar CSV" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/web/records/export?sort=customer,asc&customer=Ana+Silva",
+    ));
+  });
+
+  it("shows the session expiration message when export returns 401", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+      String(input).includes("/export?")
+        ? new Response(null, { status: 401 })
+        : pageResponse(records.slice(0, 5), 0, 6));
+    render(<PackageList onEdit={vi.fn()} refreshKey={0} />);
+    await screen.findByText("BR12345670");
+
+    fireEvent.click(screen.getByRole("button", { name: "Exportar CSV" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Sua sessão expirou. Entre novamente.");
+    expect(fetchMock).toHaveBeenLastCalledWith("/api/web/records/export?sort=postedAt,desc");
   });
 });

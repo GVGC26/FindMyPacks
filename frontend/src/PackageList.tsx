@@ -30,6 +30,14 @@ type SearchFilters = {
 
 const EMPTY_FILTERS: SearchFilters = { customer: "", status: "", carrier: "" };
 
+function filterParams(filters: SearchFilters) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value.trim()) params.set(key, value.trim());
+  });
+  return params;
+}
+
 export default function PackageList({ onEdit, refreshKey }: PackageListProps) {
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState("postedAt,desc");
@@ -39,6 +47,7 @@ export default function PackageList({ onEdit, refreshKey }: PackageListProps) {
   const [selected, setSelected] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -46,13 +55,10 @@ export default function PackageList({ onEdit, refreshKey }: PackageListProps) {
     setLoading(true);
     setError("");
     try {
-      const filterParams = new URLSearchParams();
-      Object.entries(activeFilters).forEach(([key, value]) => {
-        if (value.trim()) filterParams.set(key, value.trim());
-      });
+      const filtersQuery = filterParams(activeFilters);
       const hasFilters = Object.values(activeFilters).some((value) => value.trim().length > 0);
       const endpoint = hasFilters ? "/api/web/records/search" : "/api/web/records";
-      const query = `page=${page}&size=${PAGE_SIZE}&sort=${sort}${hasFilters ? `&${filterParams.toString()}` : ""}`;
+      const query = `page=${page}&size=${PAGE_SIZE}&sort=${sort}${hasFilters ? `&${filtersQuery.toString()}` : ""}`;
       const response = await fetch(`${endpoint}?${query}`);
       if (response.status === 401) throw new Error("Sua sessão expirou. Entre novamente.");
       if (!response.ok) throw new Error("Não foi possível carregar os pacotes.");
@@ -101,6 +107,33 @@ export default function PackageList({ onEdit, refreshKey }: PackageListProps) {
     setSelected((current) => allSelected ? current.filter((id) => !ids.includes(id)) : [...new Set([...current, ...ids])]);
   }
 
+  async function exportPackages() {
+    setExporting(true);
+    setError("");
+    setNotice("");
+    try {
+      const filtersQuery = filterParams(activeFilters).toString();
+      const query = `sort=${sort}${filtersQuery ? `&${filtersQuery}` : ""}`;
+      const response = await fetch(`/api/web/records/export?${query}`);
+      if (response.status === 401) throw new Error("Sua sessão expirou. Entre novamente.");
+      if (!response.ok) throw new Error("Não foi possível exportar os pacotes.");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "pacotes.csv";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setNotice("Pacotes exportados com sucesso.");
+    } catch (exportError) {
+      setError(exportError instanceof Error ? exportError.message : "Não foi possível exportar os pacotes.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   async function deleteSelected() {
     if (selected.length === 0 || !window.confirm(`Excluir ${selected.length} pacote(s) selecionado(s)?`)) return;
     setDeleting(true);
@@ -137,13 +170,18 @@ export default function PackageList({ onEdit, refreshKey }: PackageListProps) {
   return (
     <section className="package-card package-list" aria-labelledby="package-list-title">
       <div className="list-heading">
-        <div>
+        <div className="list-heading-actions">
           <h2 id="package-list-title">Pacotes cadastrados</h2>
           <p className="form-description">Selecione registros para excluir ou abra um pacote para editar.</p>
         </div>
-        <button className="danger-button" disabled={selected.length === 0 || deleting} onClick={() => void deleteSelected()} type="button">
-          {deleting ? "Excluindo..." : `Excluir selecionados${selected.length ? ` (${selected.length})` : ""}`}
-        </button>
+        <div>
+          <button className="danger-button" disabled={selected.length === 0 || deleting} onClick={() => void deleteSelected()} type="button">
+            {deleting ? "Excluindo..." : `Excluir selecionados${selected.length ? ` (${selected.length})` : ""}`}
+          </button>
+          <button className="secondary-button" disabled={exporting} onClick={() => void exportPackages()} type="button">
+            {exporting ? "Exportando..." : "Exportar CSV"}
+          </button>
+        </div>
       </div>
       <form className="search-panel" aria-label="Filtros de busca" onSubmit={searchPackages}>
         <div className="search-fields">

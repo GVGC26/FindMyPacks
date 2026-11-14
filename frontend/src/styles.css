@@ -539,6 +539,7 @@ select[aria-invalid="true"] {
 .search-actions button { margin-top: 0; }
 .search-actions .secondary-button { justify-content: center; }
 .list-heading, .pagination, .pagination > div { align-items: center; display: flex; justify-content: space-between; gap: 12px; }
+.list-heading-actions { align-items: center; display: flex; gap: 8px; }
 .list-heading .form-description { margin-bottom: 0; }
 .danger-button { background: #bd3344; margin-top: 0; white-space: nowrap; }
 .danger-button:hover { background: #a92737; }
