@@ -115,6 +115,19 @@ The search command calls the protected `GET /api/cli/records/search` endpoint; i
 
 Each CLI search records correlated structured `api` and `db` events with operation `search_packages` and `client` set to `cli`. Inspect them using `docker compose logs -f app`.
 
+## CSV export through the CLI (Issue #20)
+
+With `FINDMYPACKS_TOKEN` set, export every package or combine the same filters used by advanced search:
+
+```sh
+docker compose --profile cli run --rm cli export
+docker compose --profile cli run --rm cli export --customer "Maria Silva" --status IN_TRANSIT --sort postedAt --direction desc
+```
+
+The command calls the protected `GET /api/cli/records/export` endpoint and never accesses PostgreSQL directly. It accepts `--tracking-code`, `--customer`, `--destination`, `--carrier`, `--status`, `--sort`, and `--direction`. The result contains every matching package, not only the current search page. Without filters, it exports all packages. Invalid filters or sorting return HTTP 400, and a missing or invalid Bearer token returns HTTP 401.
+
+The CSV is saved at `exports/pacotes.csv` in the project directory. The file is replaced on each execution and is ignored by Git. It has the columns `trackingCode`, `customer`, `destination`, `carrier`, `status`, and `postedAt`. Export requests produce correlated JSON events at the `api` and `db` layers with operation `export_packages` and `client` set to `cli`; inspect them with `docker compose logs -f app`.
+
 ## Dashboard indicators through the CLI (Issue #12)
 
 With `FINDMYPACKS_TOKEN` set, display the three dashboard indicators as text:
