@@ -1,5 +1,6 @@
 package com.findmypacks.cli;
 
+import com.findmypacks.records.DashboardSummary;
 import com.findmypacks.records.PackageDataAccess;
 import com.findmypacks.records.PackageRecord;
 import com.findmypacks.records.PackageRequest;
@@ -75,6 +76,11 @@ public class CliController {
     public StatusResponse status(Authentication authentication) {
         boolean exists = users.findByUsername(authentication.getName()).isPresent();
         return new StatusResponse(authentication.getName(), exists ? "ACTIVE" : "MISSING");
+    }
+
+    @GetMapping("/dashboard")
+    public DashboardSummary dashboard() {
+        return packages.dashboardSummaryForLastSevenDays();
     }
 
     @PostMapping("/records")

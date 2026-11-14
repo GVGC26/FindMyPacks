@@ -117,6 +117,11 @@ public class PackageDataAccess {
                 });
     }
 
+    public DashboardSummary dashboardSummaryForLastSevenDays() {
+        LocalDate today = LocalDate.now();
+        return dashboardSummary(today.minusDays(6), today);
+    }
+
     private <T> T run(String operation, String successMessage, String errorMessage, Supplier<T> action) {
         try {
             T result = action.get();

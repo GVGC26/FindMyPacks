@@ -134,4 +134,20 @@ class PackageDataAccessTest {
         verify(operationLogger).log(
                 Level.ERROR, "db", "dashboard_summary", "error", "Package dashboard summary read failed");
     }
+
+    @Test
+    void sharesTheLastSevenDayDashboardWindow() {
+        LocalDate today = LocalDate.now();
+        LocalDate from = today.minusDays(6);
+        when(repository.countPostedBetween(from, today)).thenReturn(List.of());
+        when(repository.countByStatus()).thenReturn(List.of());
+        when(repository.countByCarrier()).thenReturn(List.of());
+
+        DashboardSummary result = dataAccess.dashboardSummaryForLastSevenDays();
+
+        assertThat(result.postedPerDay()).hasSize(7);
+        assertThat(result.postedPerDay().get(0).date()).isEqualTo(from);
+        assertThat(result.postedPerDay().get(6).date()).isEqualTo(today);
+        verify(repository).countPostedBetween(from, today);
+    }
 }

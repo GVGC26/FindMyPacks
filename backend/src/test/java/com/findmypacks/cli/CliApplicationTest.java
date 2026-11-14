@@ -136,6 +136,115 @@ class CliApplicationTest {
     }
 
     @Test
+    void indicatorsRequireTokenAndPrintDashboardValuesAsText() throws Exception {
+        assertThat(cli.run(new String[] {"indicators", "extra"}, Map.of(), out, err,
+                mock(HttpClient.class))).isEqualTo(2);
+        assertThat(errors.toString()).contains("Usage: indicators");
+        errors.reset();
+
+        assertThat(cli.run(new String[] {"indicators"}, Map.of(), out, err,
+                mock(HttpClient.class))).isEqualTo(2);
+        assertThat(errors.toString()).contains("Set FINDMYPACKS_TOKEN");
+
+        String body = """
+                {
+                  "byStatus":[{"label":"POSTED","count":2}],
+                  "byCarrier":[{"label":"CORREIOS","count":1}],
+                  "postedPerDay":[
+                    {"date":"2026-11-08","count":0},
+                    {"date":"2026-11-09","count":0},
+                    {"date":"2026-11-10","count":0},
+                    {"date":"2026-11-11","count":0},
+                    {"date":"2026-11-12","count":0},
+                    {"date":"2026-11-13","count":0},
+                    {"date":"2026-11-14","count":3}
+                  ]
+                }
+                """;
+        HttpClient client = clientReturning(200, body);
+        assertThat(cli.run(new String[] {"indicators"},
+                Map.of("FINDMYPACKS_TOKEN", "abc", "FINDMYPACKS_API_URL", "http://api"),
+                out, err, client)).isZero();
+        assertThat(output.toString())
+                .contains("Indicadores do dashboard de pacotes")
+                .contains("Pacotes por status:")
+                .contains("  Postado: 2")
+                .contains("  Em trânsito: 0")
+                .contains("Pacotes por transportadora:")
+                .contains("  Correios: 1")
+                .contains("  Outra: 0")
+                .contains("Postagens nos últimos 7 dias:")
+                .contains("  14/11/2026: 3")
+                .doesNotContain("\"byStatus\"");
+        ArgumentCaptor<java.net.http.HttpRequest> request = ArgumentCaptor.forClass(java.net.http.HttpRequest.class);
+        verify(client).send(request.capture(), any(HttpResponse.BodyHandler.class));
+        assertThat(request.getValue().method()).isEqualTo("GET");
+        assertThat(request.getValue().uri().toString()).isEqualTo("http://api/api/cli/dashboard");
+        assertThat(request.getValue().headers().firstValue("Authorization")).contains("Bearer abc");
+    }
+
+    @Test
+    void indicatorsReportApiAndMalformedResponseErrors() throws Exception {
+        HttpClient unauthorized = clientReturning(401, "denied");
+        assertThat(cli.run(new String[] {"indicators"}, Map.of("FINDMYPACKS_TOKEN", "abc"),
+                out, err, unauthorized)).isOne();
+        assertThat(errors.toString()).contains("HTTP 401");
+        errors.reset();
+
+        HttpClient malformed = clientReturning(200, "not json");
+        assertThat(cli.run(new String[] {"indicators"}, Map.of("FINDMYPACKS_TOKEN", "abc"),
+                out, err, malformed)).isOne();
+        assertThat(errors.toString()).contains("invalid dashboard response");
+        errors.reset();
+
+        HttpClient invalidCounts = clientReturning(200,
+                "{\"byStatus\":{},\"byCarrier\":[],\"postedPerDay\":[]}");
+        assertThat(cli.run(new String[] {"indicators"}, Map.of("FINDMYPACKS_TOKEN", "abc"),
+                out, err, invalidCounts)).isOne();
+        errors.reset();
+
+        HttpClient invalidCountItem = clientReturning(200,
+                "{\"byStatus\":[null],\"byCarrier\":[],\"postedPerDay\":[]}");
+        assertThat(cli.run(new String[] {"indicators"}, Map.of("FINDMYPACKS_TOKEN", "abc"),
+                out, err, invalidCountItem)).isOne();
+        errors.reset();
+
+        HttpClient negativeCount = clientReturning(200,
+                "{\"byStatus\":[{\"label\":\"POSTED\",\"count\":-1}],"
+                        + "\"byCarrier\":[],\"postedPerDay\":[]}");
+        assertThat(cli.run(new String[] {"indicators"}, Map.of("FINDMYPACKS_TOKEN", "abc"),
+                out, err, negativeCount)).isOne();
+        errors.reset();
+
+        HttpClient incomplete = clientReturning(200,
+                "{\"byStatus\":[],\"byCarrier\":[],\"postedPerDay\":[]}");
+        assertThat(cli.run(new String[] {"indicators"}, Map.of("FINDMYPACKS_TOKEN", "abc"),
+                out, err, incomplete)).isOne();
+        assertThat(errors.toString()).contains("invalid dashboard response");
+        errors.reset();
+
+        String invalidDate = "{\"byStatus\":[],\"byCarrier\":[],\"postedPerDay\":["
+                + "{\"date\":\"not-a-date\",\"count\":0},"
+                + "{\"date\":\"2026-11-09\",\"count\":0},"
+                + "{\"date\":\"2026-11-10\",\"count\":0},"
+                + "{\"date\":\"2026-11-11\",\"count\":0},"
+                + "{\"date\":\"2026-11-12\",\"count\":0},"
+                + "{\"date\":\"2026-11-13\",\"count\":0},"
+                + "{\"date\":\"2026-11-14\",\"count\":0}]}";
+        HttpClient invalidDateClient = clientReturning(200, invalidDate);
+        assertThat(cli.run(new String[] {"indicators"}, Map.of("FINDMYPACKS_TOKEN", "abc"),
+                out, err, invalidDateClient)).isOne();
+        assertThat(errors.toString()).contains("invalid dashboard response");
+        errors.reset();
+
+        String nonTextDate = invalidDate.replace("\"not-a-date\"", "20261108");
+        HttpClient nonTextDateClient = clientReturning(200, nonTextDate);
+        assertThat(cli.run(new String[] {"indicators"}, Map.of("FINDMYPACKS_TOKEN", "abc"),
+                out, err, nonTextDateClient)).isOne();
+        assertThat(errors.toString()).contains("invalid dashboard response");
+    }
+
+    @Test
     void reportsHttpConnectionInterruptionAndUnknownCommand() throws Exception {
         assertThat(cli.run(new String[] {"unknown"}, Map.of(), out, err, mock(HttpClient.class))).isEqualTo(2);
         assertThat(errors.toString()).contains("Unknown command");
