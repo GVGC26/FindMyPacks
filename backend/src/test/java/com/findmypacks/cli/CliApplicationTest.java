@@ -11,11 +11,15 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 
 class CliApplicationTest {
+    @TempDir Path temporaryDirectory;
     private final CliApplication cli = new CliApplication();
     private final ByteArrayOutputStream output = new ByteArrayOutputStream();
     private final ByteArrayOutputStream errors = new ByteArrayOutputStream();
@@ -133,6 +137,56 @@ class CliApplicationTest {
                 .isEqualTo("page=1&size=1&sort=customer%2Casc&customer=Maria+Silva"
                         + "&destination=S%C3%A3o+Paulo&status=IN_TRANSIT");
         assertThat(request.getValue().headers().firstValue("Authorization")).contains("Bearer abc");
+    }
+
+    @Test
+    void exportValidatesOptionsAndWritesAllReturnedCsvToConfiguredFile() throws Exception {
+        assertThat(cli.run(new String[] {"export", "--customer"}, Map.of(), out, err,
+                mock(HttpClient.class))).isEqualTo(2);
+        assertThat(cli.run(new String[] {"export", "--unknown", "value"}, Map.of(), out, err,
+                mock(HttpClient.class))).isEqualTo(2);
+        assertThat(cli.run(new String[] {"export", "--customer", " "}, Map.of(), out, err,
+                mock(HttpClient.class))).isEqualTo(2);
+        assertThat(errors.toString()).contains("Usage: export");
+
+        assertThat(cli.run(new String[] {"export"}, Map.of(), out, err,
+                mock(HttpClient.class))).isEqualTo(2);
+        assertThat(errors.toString()).contains("Set FINDMYPACKS_TOKEN");
+
+        Path destination = temporaryDirectory.resolve("nested/pacotes.csv");
+        HttpClient client = clientReturning(200, "trackingCode,customer\r\nABC12345,Maria");
+        assertThat(cli.run(new String[] {"export", "--customer", "Maria Silva",
+                        "--status", "IN_TRANSIT", "--sort", "customer", "--direction", "asc"},
+                Map.of("FINDMYPACKS_TOKEN", "abc", "FINDMYPACKS_API_URL", "http://api",
+                        "FINDMYPACKS_EXPORT_FILE", destination.toString()), out, err, client)).isZero();
+        assertThat(Files.readString(destination)).contains("ABC12345,Maria");
+        assertThat(output.toString()).contains("CSV saved to", "pacotes.csv");
+
+        ArgumentCaptor<java.net.http.HttpRequest> request = ArgumentCaptor.forClass(java.net.http.HttpRequest.class);
+        verify(client).send(request.capture(), any(HttpResponse.BodyHandler.class));
+        assertThat(request.getValue().uri().getPath()).isEqualTo("/api/cli/records/export");
+        assertThat(request.getValue().uri().getRawQuery())
+                .isEqualTo("sort=customer%2Casc&customer=Maria+Silva&status=IN_TRANSIT");
+        assertThat(request.getValue().headers().firstValue("Authorization")).contains("Bearer abc");
+    }
+
+    @Test
+    void exportUsesDefaultFileAndReportsApiErrors() throws Exception {
+        String previousDirectory = System.getProperty("user.dir");
+        System.setProperty("user.dir", temporaryDirectory.toString());
+        try {
+            HttpClient success = clientReturning(200, "trackingCode,customer");
+            assertThat(cli.run(new String[] {"export"}, Map.of("FINDMYPACKS_TOKEN", "abc"),
+                    out, err, success)).isZero();
+            Files.deleteIfExists(Path.of("pacotes.csv"));
+        } finally {
+            System.setProperty("user.dir", previousDirectory);
+        }
+
+        HttpClient unauthorized = clientReturning(401, "denied");
+        assertThat(cli.run(new String[] {"export"}, Map.of("FINDMYPACKS_TOKEN", "abc"),
+                out, err, unauthorized)).isOne();
+        assertThat(errors.toString()).contains("HTTP 401");
     }
 
     @Test

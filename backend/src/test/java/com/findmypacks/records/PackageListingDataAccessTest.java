@@ -95,6 +95,26 @@ class PackageListingDataAccessTest {
     }
 
     @Test
+    void exportsPackagesForCliAndLogsSuccessfulDatabaseRead() {
+        Sort sort = Sort.by(Sort.Direction.DESC, "postedAt");
+        List<PackageRecord> records = List.of(record);
+        when(repository.exportRecords("", "ana", "", "", "", sort)).thenReturn(records);
+
+        assertThat(dataAccess.exportAllForCli("", "ana", "", "", "", sort)).isSameAs(records);
+        verify(operationLogger).log(Level.INFO, "db", "export_packages", "success", "Package records exported");
+    }
+
+    @Test
+    void logsCliExportFailureAndRethrowsIt() {
+        Sort sort = Sort.by(Sort.Direction.ASC, "customer");
+        IllegalStateException failure = new IllegalStateException("database unavailable");
+        when(repository.exportRecords("", "", "", "", "", sort)).thenThrow(failure);
+
+        assertThatThrownBy(() -> dataAccess.exportAllForCli("", "", "", "", "", sort)).isSameAs(failure);
+        verify(operationLogger).log(Level.ERROR, "db", "export_packages", "error", "Package records export failed");
+    }
+
+    @Test
     void deletesPackageAndLogsSuccessfulDatabaseWrite() {
         dataAccess.deleteById(7L);
 
