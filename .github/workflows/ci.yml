@@ -11,18 +11,6 @@ permissions:
   pull-requests: read
 
 jobs:
-  fork-main-source:
-    name: fork-main-source
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.fork == true &&
-      github.event.pull_request.head.ref == 'main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Recommend a topic branch for upstream pull requests
-        run: |
-          echo "::warning::Create a topic branch from the upstream main and open upstream pull requests from that branch, not from fork main. Commits recreated while merging into fork main may lose SSH signatures."
-
   ssh-signatures:
     name: ssh-signatures
     if: github.event_name == 'pull_request'
