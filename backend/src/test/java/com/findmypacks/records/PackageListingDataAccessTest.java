@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.slf4j.MDC;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -71,6 +72,26 @@ class PackageListingDataAccessTest {
 
         assertThatThrownBy(() -> dataAccess.search(null, null, null, null, null, pageable)).isSameAs(failure);
         verify(operationLogger).log(Level.ERROR, "db", "search_packages", "error", "Package records search failed");
+    }
+
+    @Test
+    void exportsPackagesAndLogsSuccessfulDatabaseRead() {
+        Sort sort = Sort.by(Sort.Direction.DESC, "postedAt");
+        List<PackageRecord> records = List.of(record);
+        when(repository.exportRecords("", "ana", "", "", "", sort)).thenReturn(records);
+
+        assertThat(dataAccess.exportAll("", "ana", "", "", "", sort)).isSameAs(records);
+        verify(operationLogger).log(Level.INFO, "db", "export_packages", "success", "Package records exported");
+    }
+
+    @Test
+    void logsExportFailureAndRethrowsIt() {
+        Sort sort = Sort.by(Sort.Direction.ASC, "customer");
+        IllegalStateException failure = new IllegalStateException("database unavailable");
+        when(repository.exportRecords("", "", "", "", "", sort)).thenThrow(failure);
+
+        assertThatThrownBy(() -> dataAccess.exportAll("", "", "", "", "", sort)).isSameAs(failure);
+        verify(operationLogger).log(Level.ERROR, "db", "export_packages", "error", "Package records export failed");
     }
 
     @Test

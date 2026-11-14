@@ -210,6 +210,21 @@ Example: `GET /api/web/records/search?customer=maria&status=IN_TRANSIT&page=0&si
 
 The frontend behavior is covered by `PackageList.test.tsx`. Backend coverage is in `PackageListingApiIntegrationTest` and `PackageListingDataAccessTest`.
 
+## CSV export (issue #5)
+
+The authenticated Web endpoint `GET /api/web/records/export` downloads every package matching the supplied filters, regardless of the current list page. It accepts the same filters as advanced search—`trackingCode`, `customer`, `destination`, `carrier`, and `status`—plus `sort`. It does not accept `page` or `size`. Text filters use case-insensitive partial matching; `carrier` and `status` must be valid values. Sorting uses the same allowed fields and directions as search (`trackingCode`, `customer`, `destination`, or `postedAt`; `asc` or `desc`) and defaults to `postedAt,desc`. Blank filters are ignored. With no filters, the request is `/api/web/records/export?sort=postedAt,desc`.
+
+The response is `200` with `Content-Type: text/csv; charset=UTF-8` and `Content-Disposition: attachment; filename="pacotes.csv"`. Columns are emitted in this order: `trackingCode`, `customer`, `destination`, `carrier`, `status`, `postedAt`. Rows are separated by CRLF. A field containing a comma, quote, or line break is enclosed in double quotes, and quotes inside it are doubled. Text cells beginning with `=`, `+`, `-`, or `@` are prefixed with an apostrophe to prevent spreadsheet formula execution. If no packages match, the CSV contains only the header row.
+
+Example using the authenticated `$session` created in the login example above; this downloads all matching records to `pacotes.csv`:
+
+```powershell
+$url = "http://localhost:8080/api/web/records/export?customer=maria&status=IN_TRANSIT&sort=postedAt,desc"
+Invoke-WebRequest -Uri $url -WebSession $session -OutFile pacotes.csv
+```
+
+The frontend **Exportar CSV** button uses the filters currently applied by **Buscar** and the table's active sort. The export request is logged as `export_packages` at both the `api` and `db` layers, with the same `request_id`; follow the request with `docker compose logs app` or a supplied `X-Request-Id`. Tests are `PackageExportApiIntegrationTest`, the export success/failure cases in `PackageListingDataAccessTest`, and the export cases in `PackageList.test.tsx`. Run all tests with `docker compose --profile test run --build --rm tests`.
+
 ### Endpoints
 
 Both endpoints require an authenticated session and a CSRF token (`GET /api/web/csrf`, sent in the `X-XSRF-TOKEN` header). Requests without a valid session receive HTTP 401. The JSON body uses the camelCase field names from the table above.

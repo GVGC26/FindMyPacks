@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import java.util.function.Supplier;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -83,6 +84,12 @@ public class PackageDataAccess {
                                       String carrier, String status, Pageable pageable) {
         return run("search_packages", "Package records searched", "Package records search failed",
                 () -> packages.search(trackingCode, customer, destination, carrier, status, pageable));
+    }
+
+    public List<PackageRecord> exportAll(String trackingCode, String customer, String destination,
+                                         String carrier, String status, Sort sort) {
+        return run("export_packages", "Package records exported", "Package records export failed",
+                () -> packages.exportRecords(trackingCode, customer, destination, carrier, status, sort));
     }
 
     public void deleteById(Long id) {
