@@ -19,10 +19,9 @@ jobs:
       github.event.pull_request.head.ref == 'main'
     runs-on: ubuntu-latest
     steps:
-      - name: Require a topic branch for upstream pull requests
+      - name: Recommend a topic branch for upstream pull requests
         run: |
-          echo "::error::Create a topic branch from the upstream main and open the pull request from that branch, not from fork main."
-          exit 1
+          echo "::warning::Create a topic branch from the upstream main and open upstream pull requests from that branch, not from fork main. Commits recreated while merging into fork main may lose SSH signatures."
 
   ssh-signatures:
     name: ssh-signatures
