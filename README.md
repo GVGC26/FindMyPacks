@@ -102,6 +102,19 @@ The commands call `GET /api/cli/records?page=0&size=5&sort=trackingCode,asc` and
 
 List and delete operations produce correlated JSON events in the API and database layers with `client` set to `cli`. View them with `docker compose logs -f app`.
 
+## Advanced package search through the CLI (Issue #10)
+
+The CLI can combine the same filters as the Web search: tracking code, customer, destination, carrier, and status. Text fields match partial values without case sensitivity; carrier and status match their allowed codes without case sensitivity. Blank filters are ignored. Set `FINDMYPACKS_TOKEN` and pass any combination of the filters:
+
+```sh
+docker compose --profile cli run --rm cli search --customer "Maria Silva" --destination Fortaleza --status IN_TRANSIT
+docker compose --profile cli run --rm cli search --tracking-code BR123 --carrier CORREIOS --page 0 --size 10 --sort postedAt --direction desc
+```
+
+The search command calls the protected `GET /api/cli/records/search` endpoint; it never accesses PostgreSQL directly. The endpoint accepts `trackingCode`, `customer`, `destination`, `carrier`, `status`, `page`, `size`, and `sort`, with the same matching, validation, paging, and sorting behavior as `GET /api/web/records/search`. Sort fields are `trackingCode`, `customer`, `destination`, and `postedAt`; page numbering starts at zero and page size must be from 1 to 100. Invalid filters or paging/sort values return HTTP 400, and a missing or invalid Bearer token returns HTTP 401.
+
+Each CLI search records correlated structured `api` and `db` events with operation `search_packages` and `client` set to `cli`. Inspect them using `docker compose logs -f app`.
+
 ## Logs and request correlation
 
 Each Web and CLI operation writes a single-line JSON event to stdout with an ISO 8601 UTC timestamp, level, layer, client, operation, status, request ID, and a short message. Database reads made by an operation produce a separate `db` event with the same request ID and client. Successful and failed login attempts are logged without passwords or request payloads. SQL statements and bind values are not logged.

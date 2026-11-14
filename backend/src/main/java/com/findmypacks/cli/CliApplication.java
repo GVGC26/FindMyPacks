@@ -6,6 +6,9 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class CliApplication {
@@ -24,6 +27,10 @@ public class CliApplication {
                                            Edit a package
               list [page] [sortField] [direction]
                                            List five packages per page
+              search [--tracking-code value] [--customer value] [--destination value]
+                     [--carrier value] [--status value] [--page number] [--size number]
+                     [--sort field] [--direction asc|desc]
+                                           Search packages with combinable filters
               delete <id>                  Delete a package
 
             Environment:
@@ -49,6 +56,7 @@ public class CliApplication {
                 case "update" -> writeRecord(args, 8, "PUT", "/api/cli/records/" + argument(args, 1), environment,
                         baseUrl, client, out, err);
                 case "list" -> listRecords(args, environment, baseUrl, client, out, err);
+                case "search" -> searchRecords(args, environment, baseUrl, client, out, err);
                 case "delete" -> deleteRecord(args, environment, baseUrl, client, out, err);
                 default -> unknown(command, err);
             };
@@ -157,6 +165,62 @@ public class CliApplication {
         }
         return protectedRequest(environment, baseUrl + "/api/cli/records/" + args[1],
                 "DELETE", client, out, err);
+    }
+
+    private int searchRecords(
+            String[] args,
+            Map<String, String> environment,
+            String baseUrl,
+            HttpClient client,
+            PrintStream out,
+            PrintStream err) throws IOException, InterruptedException {
+        Map<String, String> parameters = new LinkedHashMap<>();
+        parameters.put("page", "0");
+        parameters.put("size", "5");
+        parameters.put("sort", "postedAt,desc");
+
+        Map<String, String> optionNames = Map.of(
+                "--tracking-code", "trackingCode",
+                "--customer", "customer",
+                "--destination", "destination",
+                "--carrier", "carrier",
+                "--status", "status",
+                "--page", "page",
+                "--size", "size",
+                "--sort", "sort",
+                "--direction", "direction");
+        if (args.length < 2 || (args.length - 1) % 2 != 0) {
+            return searchUsage(err);
+        }
+        for (int index = 1; index < args.length; index += 2) {
+            String parameter = optionNames.get(args[index]);
+            if (parameter == null || args[index + 1].isBlank()) {
+                return searchUsage(err);
+            }
+            parameters.put(parameter, args[index + 1]);
+        }
+        String direction = parameters.remove("direction");
+        if (direction != null) {
+            parameters.put("sort", parameters.get("sort").split(",", -1)[0] + "," + direction);
+        }
+        StringBuilder query = new StringBuilder();
+        parameters.forEach((name, value) -> {
+            if (query.length() > 0) query.append('&');
+            query.append(encode(name)).append('=').append(encode(value));
+        });
+        return protectedRequest(environment, baseUrl + "/api/cli/records/search?" + query,
+                "GET", client, out, err);
+    }
+
+    private String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private int searchUsage(PrintStream err) {
+        err.println("Usage: search [--tracking-code value] [--customer value] [--destination value]"
+                + " [--carrier value] [--status value] [--page number] [--size number]"
+                + " [--sort field] [--direction asc|desc]");
+        return 2;
     }
 
     private int protectedRequest(
