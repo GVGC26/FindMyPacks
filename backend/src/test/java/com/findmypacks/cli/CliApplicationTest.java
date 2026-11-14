@@ -109,6 +109,33 @@ class CliApplicationTest {
     }
 
     @Test
+    void searchRequiresOptionsAndSendsEncodedCombinableFiltersToCliApi() throws Exception {
+        assertThat(cli.run(new String[] {"search"}, Map.of(), out, err, mock(HttpClient.class))).isEqualTo(2);
+        assertThat(cli.run(new String[] {"search", "--unknown", "value"}, Map.of(), out, err,
+                mock(HttpClient.class))).isEqualTo(2);
+        assertThat(cli.run(new String[] {"search", "--customer"}, Map.of(), out, err,
+                mock(HttpClient.class))).isEqualTo(2);
+        assertThat(cli.run(new String[] {"search", "--customer", " "}, Map.of(), out, err,
+                mock(HttpClient.class))).isEqualTo(2);
+        assertThat(errors.toString()).contains("Usage: search");
+
+        HttpClient client = clientReturning(200, "{\"content\":[]}");
+        assertThat(cli.run(new String[] {"search", "--customer", "Maria Silva",
+                        "--destination", "São Paulo", "--status", "IN_TRANSIT",
+                        "--page", "1", "--size", "1", "--sort", "customer", "--direction", "asc"},
+                Map.of("FINDMYPACKS_TOKEN", "abc", "FINDMYPACKS_API_URL", "http://api"),
+                out, err, client)).isZero();
+        ArgumentCaptor<java.net.http.HttpRequest> request = ArgumentCaptor.forClass(java.net.http.HttpRequest.class);
+        verify(client).send(request.capture(), any(HttpResponse.BodyHandler.class));
+        assertThat(request.getValue().method()).isEqualTo("GET");
+        assertThat(request.getValue().uri().getPath()).isEqualTo("/api/cli/records/search");
+        assertThat(request.getValue().uri().getRawQuery())
+                .isEqualTo("page=1&size=1&sort=customer%2Casc&customer=Maria+Silva"
+                        + "&destination=S%C3%A3o+Paulo&status=IN_TRANSIT");
+        assertThat(request.getValue().headers().firstValue("Authorization")).contains("Bearer abc");
+    }
+
+    @Test
     void reportsHttpConnectionInterruptionAndUnknownCommand() throws Exception {
         assertThat(cli.run(new String[] {"unknown"}, Map.of(), out, err, mock(HttpClient.class))).isEqualTo(2);
         assertThat(errors.toString()).contains("Unknown command");

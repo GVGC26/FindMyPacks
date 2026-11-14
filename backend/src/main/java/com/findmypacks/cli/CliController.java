@@ -4,6 +4,7 @@ import com.findmypacks.records.PackageDataAccess;
 import com.findmypacks.records.PackageRecord;
 import com.findmypacks.records.PackageRequest;
 import com.findmypacks.records.PackageResponse;
+import com.findmypacks.records.PackageSearchParameters;
 import com.findmypacks.user.AppUserDataAccess;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -34,6 +35,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -102,6 +104,22 @@ public class CliController {
     @GetMapping("/records")
     public Page<PackageResponse> list(Pageable pageable) {
         return packages.findAllForCli(pageable).map(PackageResponse::from);
+    }
+
+    @GetMapping("/records/search")
+    public Page<PackageResponse> search(
+            @RequestParam(required = false) String trackingCode,
+            @RequestParam(required = false) String customer,
+            @RequestParam(required = false) String destination,
+            @RequestParam(required = false) String carrier,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size,
+            @RequestParam(defaultValue = "postedAt,desc") String sort) {
+        PackageSearchParameters parameters = PackageSearchParameters.from(
+                trackingCode, customer, destination, carrier, status, page, size, sort);
+        return packages.search(parameters.trackingCode(), parameters.customer(), parameters.destination(),
+                parameters.carrier(), parameters.status(), parameters.pageable()).map(PackageResponse::from);
     }
 
     @DeleteMapping("/records/{id}")
