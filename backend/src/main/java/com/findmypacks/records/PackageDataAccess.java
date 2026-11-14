@@ -92,6 +92,12 @@ public class PackageDataAccess {
                 () -> packages.exportRecords(trackingCode, customer, destination, carrier, status, sort));
     }
 
+    public List<PackageRecord> exportAllForCli(String trackingCode, String customer, String destination,
+                                               String carrier, String status, Sort sort) {
+        return run("export_packages", "Package records exported", "Package records export failed",
+                () -> packages.exportRecords(trackingCode, customer, destination, carrier, status, sort));
+    }
+
     public void deleteById(Long id) {
         run("delete", "Package record deleted", "Package record delete failed", () -> {
             packages.deleteById(id);

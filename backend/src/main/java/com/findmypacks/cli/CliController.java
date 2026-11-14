@@ -15,10 +15,12 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.io.IOException;
 import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -126,6 +128,43 @@ public class CliController {
                 trackingCode, customer, destination, carrier, status, page, size, sort);
         return packages.search(parameters.trackingCode(), parameters.customer(), parameters.destination(),
                 parameters.carrier(), parameters.status(), parameters.pageable()).map(PackageResponse::from);
+    }
+
+    @GetMapping(value = "/records/export", produces = "text/csv; charset=UTF-8")
+    public ResponseEntity<String> export(
+            @RequestParam(required = false) String trackingCode,
+            @RequestParam(required = false) String customer,
+            @RequestParam(required = false) String destination,
+            @RequestParam(required = false) String carrier,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "postedAt,desc") String sort) {
+        PackageSearchParameters parameters = PackageSearchParameters.from(
+                trackingCode, customer, destination, carrier, status, 0, 1, sort);
+        List<PackageRecord> records = packages.exportAllForCli(parameters.trackingCode(), parameters.customer(),
+                parameters.destination(), parameters.carrier(), parameters.status(), parameters.pageable().getSort());
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                .header("Content-Disposition", "attachment; filename=\"pacotes.csv\"")
+                .body(csv(records));
+    }
+
+    private String csv(List<PackageRecord> records) {
+        StringBuilder csv = new StringBuilder("trackingCode,customer,destination,carrier,status,postedAt");
+        for (PackageRecord record : records) {
+            csv.append("\r\n").append(String.join(",",
+                    csvCell(record.getTrackingCode()), csvCell(record.getCustomer()),
+                    csvCell(record.getDestination()), csvCell(record.getCarrier()),
+                    csvCell(record.getStatus()), csvCell(record.getPostedAt().toString())));
+        }
+        return csv.toString();
+    }
+
+    private String csvCell(String value) {
+        String safe = !value.isEmpty() && "=+-@".indexOf(value.charAt(0)) >= 0 ? "'" + value : value;
+        if (safe.contains(",") || safe.contains("\"") || safe.contains("\r") || safe.contains("\n")) {
+            return "\"" + safe.replace("\"", "\"\"") + "\"";
+        }
+        return safe;
     }
 
     @DeleteMapping("/records/{id}")
