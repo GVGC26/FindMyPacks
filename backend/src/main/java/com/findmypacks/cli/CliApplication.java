@@ -11,6 +11,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -51,12 +53,17 @@ public class CliApplication {
                      [--carrier value] [--status value] [--page number] [--size number]
                      [--sort field] [--direction asc|desc]
                                            Search packages with combinable filters
+              export [--tracking-code value] [--customer value] [--destination value]
+                     [--carrier value] [--status value] [--sort field]
+                     [--direction asc|desc]
+                                           Export all matching packages to CSV
               indicators                   Show the three dashboard indicators
               delete <id>                  Delete a package
 
             Environment:
               FINDMYPACKS_API_URL  API URL (default: http://app:8080)
               FINDMYPACKS_TOKEN    Bearer token used by protected commands
+              FINDMYPACKS_EXPORT_FILE  CSV destination (default: pacotes.csv)
             """;
 
     public static void main(String[] args) {
@@ -78,6 +85,7 @@ public class CliApplication {
                         baseUrl, client, out, err);
                 case "list" -> listRecords(args, environment, baseUrl, client, out, err);
                 case "search" -> searchRecords(args, environment, baseUrl, client, out, err);
+                case "export" -> exportRecords(args, environment, baseUrl, client, out, err);
                 case "indicators" -> dashboardIndicators(args, environment, baseUrl, client, out, err);
                 case "delete" -> deleteRecord(args, environment, baseUrl, client, out, err);
                 default -> unknown(command, err);
@@ -342,6 +350,78 @@ public class CliApplication {
         });
         return protectedRequest(environment, baseUrl + "/api/cli/records/search?" + query,
                 "GET", client, out, err);
+    }
+
+    private int exportRecords(
+            String[] args,
+            Map<String, String> environment,
+            String baseUrl,
+            HttpClient client,
+            PrintStream out,
+            PrintStream err) throws IOException, InterruptedException {
+        Map<String, String> parameters = exportParameters(args, err);
+        if (parameters == null) {
+            return 2;
+        }
+        String token = environment.get("FINDMYPACKS_TOKEN");
+        if (token == null || token.isBlank()) {
+            err.println("Set FINDMYPACKS_TOKEN before using protected commands");
+            return 2;
+        }
+        StringBuilder query = new StringBuilder();
+        parameters.forEach((name, value) -> {
+            if (query.length() > 0) query.append('&');
+            query.append(encode(name)).append('=').append(encode(value));
+        });
+        HttpResponse<String> response = client.send(
+                request(baseUrl + "/api/cli/records/export?" + query, "GET", null, token),
+                HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            err.println("API returned HTTP " + response.statusCode() + ": " + response.body());
+            return 1;
+        }
+        Path file = Path.of(environment.getOrDefault("FINDMYPACKS_EXPORT_FILE", "pacotes.csv"));
+        Path parent = file.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        Files.writeString(file, response.body(), StandardCharsets.UTF_8);
+        out.println("CSV saved to " + file);
+        return 0;
+    }
+
+    private Map<String, String> exportParameters(String[] args, PrintStream err) {
+        Map<String, String> parameters = new LinkedHashMap<>();
+        parameters.put("sort", "postedAt,desc");
+        Map<String, String> optionNames = Map.of(
+                "--tracking-code", "trackingCode",
+                "--customer", "customer",
+                "--destination", "destination",
+                "--carrier", "carrier",
+                "--status", "status",
+                "--sort", "sort",
+                "--direction", "direction");
+        if ((args.length - 1) % 2 != 0) {
+            return exportUsage(err);
+        }
+        for (int index = 1; index < args.length; index += 2) {
+            String parameter = optionNames.get(args[index]);
+            if (parameter == null || args[index + 1].isBlank()) {
+                return exportUsage(err);
+            }
+            parameters.put(parameter, args[index + 1]);
+        }
+        String direction = parameters.remove("direction");
+        if (direction != null) {
+            parameters.put("sort", parameters.get("sort").split(",", -1)[0] + "," + direction);
+        }
+        return parameters;
+    }
+
+    private Map<String, String> exportUsage(PrintStream err) {
+        err.println("Usage: export [--tracking-code value] [--customer value] [--destination value]"
+                + " [--carrier value] [--status value] [--sort field] [--direction asc|desc]");
+        return null;
     }
 
     private String encode(String value) {
