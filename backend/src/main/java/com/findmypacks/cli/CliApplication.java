@@ -1,5 +1,8 @@
 package com.findmypacks.cli;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.URI;
@@ -8,10 +11,27 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public class CliApplication {
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final DateTimeFormatter DISPLAY_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final List<Map.Entry<String, String>> STATUSES = List.of(
+            Map.entry("POSTED", "Postado"),
+            Map.entry("IN_TRANSIT", "Em trânsito"),
+            Map.entry("OUT_FOR_DELIVERY", "Saiu para entrega"),
+            Map.entry("DELIVERED", "Entregue"));
+    private static final List<Map.Entry<String, String>> CARRIERS = List.of(
+            Map.entry("CORREIOS", "Correios"),
+            Map.entry("JADLOG", "Jadlog"),
+            Map.entry("LOGGI", "Loggi"),
+            Map.entry("OTHER", "Outra"));
+
     private static final String HELP = """
             FindMyPacks CLI
             Usage: docker compose --profile cli run --rm cli <command> [options]
@@ -31,6 +51,7 @@ public class CliApplication {
                      [--carrier value] [--status value] [--page number] [--size number]
                      [--sort field] [--direction asc|desc]
                                            Search packages with combinable filters
+              indicators                   Show the three dashboard indicators
               delete <id>                  Delete a package
 
             Environment:
@@ -57,6 +78,7 @@ public class CliApplication {
                         baseUrl, client, out, err);
                 case "list" -> listRecords(args, environment, baseUrl, client, out, err);
                 case "search" -> searchRecords(args, environment, baseUrl, client, out, err);
+                case "indicators" -> dashboardIndicators(args, environment, baseUrl, client, out, err);
                 case "delete" -> deleteRecord(args, environment, baseUrl, client, out, err);
                 default -> unknown(command, err);
             };
@@ -165,6 +187,116 @@ public class CliApplication {
         }
         return protectedRequest(environment, baseUrl + "/api/cli/records/" + args[1],
                 "DELETE", client, out, err);
+    }
+
+    private int dashboardIndicators(
+            String[] args,
+            Map<String, String> environment,
+            String baseUrl,
+            HttpClient client,
+            PrintStream out,
+            PrintStream err) throws IOException, InterruptedException {
+        if (args.length != 1) {
+            err.println("Usage: indicators");
+            return 2;
+        }
+        String token = environment.get("FINDMYPACKS_TOKEN");
+        if (token == null || token.isBlank()) {
+            err.println("Set FINDMYPACKS_TOKEN before using protected commands");
+            return 2;
+        }
+        HttpResponse<String> response = client.send(
+                request(baseUrl + "/api/cli/dashboard", "GET", null, token),
+                HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            err.println("API returned HTTP " + response.statusCode() + ": " + response.body());
+            return 1;
+        }
+        JsonNode summary;
+        try {
+            summary = JSON.readTree(response.body());
+        } catch (JsonProcessingException exception) {
+            err.println("API returned an invalid dashboard response");
+            return 1;
+        }
+        if (!isDashboardSummary(summary)) {
+            err.println("API returned an invalid dashboard response");
+            return 1;
+        }
+        out.print(formatDashboardIndicators(summary));
+        return 0;
+    }
+
+    private boolean isDashboardSummary(JsonNode summary) {
+        if (summary == null || !summary.isObject()
+                || !isCountList(summary.path("byStatus"))
+                || !isCountList(summary.path("byCarrier"))) {
+            return false;
+        }
+        JsonNode days = summary.path("postedPerDay");
+        if (!days.isArray() || days.size() != 7) {
+            return false;
+        }
+        for (JsonNode day : days) {
+            JsonNode date = day.path("date");
+            if (!date.isTextual() || !isNonNegativeLong(day.path("count"))) {
+                return false;
+            }
+            try {
+                LocalDate.parse(date.asText());
+            } catch (DateTimeParseException exception) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean isCountList(JsonNode counts) {
+        if (!counts.isArray()) {
+            return false;
+        }
+        for (JsonNode item : counts) {
+            if (!item.isObject() || !item.path("label").isTextual()
+                    || !isNonNegativeLong(item.path("count"))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean isNonNegativeLong(JsonNode value) {
+        return value.isIntegralNumber() && value.canConvertToLong() && value.asLong() >= 0;
+    }
+
+    private String formatDashboardIndicators(JsonNode summary) {
+        StringBuilder text = new StringBuilder("Indicadores do dashboard de pacotes\n");
+        appendCounts(text, "Pacotes por status", summary.path("byStatus"), STATUSES);
+        appendCounts(text, "Pacotes por transportadora", summary.path("byCarrier"), CARRIERS);
+        text.append("Postagens nos últimos 7 dias:\n");
+        for (JsonNode day : summary.path("postedPerDay")) {
+            String date = LocalDate.parse(day.path("date").asText()).format(DISPLAY_DATE);
+            text.append("  ").append(date).append(": ")
+                    .append(day.path("count").asLong()).append('\n');
+        }
+        return text.toString();
+    }
+
+    private void appendCounts(
+            StringBuilder text,
+            String title,
+            JsonNode counts,
+            List<Map.Entry<String, String>> choices) {
+        text.append(title).append(":\n");
+        for (Map.Entry<String, String> choice : choices) {
+            long count = 0;
+            for (JsonNode item : counts) {
+                if (choice.getKey().equals(item.path("label").asText())) {
+                    count = item.path("count").asLong();
+                    break;
+                }
+            }
+            text.append("  ").append(choice.getValue()).append(": ").append(count).append('\n');
+        }
     }
 
     private int searchRecords(

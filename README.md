@@ -115,6 +115,18 @@ The search command calls the protected `GET /api/cli/records/search` endpoint; i
 
 Each CLI search records correlated structured `api` and `db` events with operation `search_packages` and `client` set to `cli`. Inspect them using `docker compose logs -f app`.
 
+## Dashboard indicators through the CLI (Issue #12)
+
+With `FINDMYPACKS_TOKEN` set, display the three dashboard indicators as text:
+
+```sh
+docker compose --profile cli run --rm cli indicators
+```
+
+The command calls the protected `GET /api/cli/dashboard` endpoint and displays package counts by status, package counts by carrier, and the number of packages posted on each of the last seven days. It uses the same summary and date window as `GET /api/web/dashboard`, including zero-count categories and dates, so the values match the Web dashboard. The CLI calls the API and does not connect to PostgreSQL directly.
+
+Each request writes correlated structured `api` and `db` events using operation `dashboard` and `dashboard_summary`, respectively, with `client` set to `cli`. Inspect them using `docker compose logs -f app`. A missing or invalid Bearer token returns HTTP 401.
+
 ## Logs and request correlation
 
 Each Web and CLI operation writes a single-line JSON event to stdout with an ISO 8601 UTC timestamp, level, layer, client, operation, status, request ID, and a short message. Database reads made by an operation produce a separate `db` event with the same request ID and client. Successful and failed login attempts are logged without passwords or request payloads. SQL statements and bind values are not logged.

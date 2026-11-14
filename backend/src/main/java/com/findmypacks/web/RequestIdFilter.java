@@ -97,6 +97,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
             case "/api/cli/health" -> "health";
             case "/api/cli/token" -> "token";
             case "/api/cli/status" -> "status";
+            case "/api/cli/dashboard" -> "dashboard";
             default -> request.getMethod().toLowerCase(Locale.ROOT) + "_" + request.getRequestURI();
         };
     }
